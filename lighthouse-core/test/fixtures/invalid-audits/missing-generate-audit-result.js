@@ -18,7 +18,7 @@ class MissingGenerateAuditResult {
 
   static audit(_) {
     return {
-      score: 1,
+      rawValue: true,
     };
   }
 }

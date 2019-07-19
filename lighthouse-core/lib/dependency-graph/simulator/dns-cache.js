@@ -16,9 +16,19 @@ class DNSCache {
   /**
    * @param {{rtt: number}} options
    */
-  constructor({rtt}) {
-    this._rtt = rtt;
+  constructor(options) {
+    this._options = Object.assign(
+      {
+        rtt: undefined,
+      },
+      options
+    );
 
+    if (!this._options.rtt) {
+      throw new Error('Cannot create DNS cache with no rtt');
+    }
+
+    this._rtt = this._options.rtt;
     /** @type {Map<string, {resolvedAt: number}>} */
     this._resolvedDomainNames = new Map();
   }

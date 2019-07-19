@@ -5,8 +5,8 @@
  */
 'use strict';
 
-const statistics = require('../lib/statistics.js');
-const Util = require('../report/html/renderer/util.js');
+const statistics = require('../lib/statistics');
+const Util = require('../report/html/renderer/util');
 
 const DEFAULT_PASS = 'defaultPass';
 
@@ -34,7 +34,7 @@ class Audit {
       BINARY: 'binary',
       MANUAL: 'manual',
       INFORMATIVE: 'informative',
-      NOT_APPLICABLE: 'notApplicable',
+      NOT_APPLICABLE: 'not-applicable',
       ERROR: 'error',
     };
   }
@@ -90,10 +90,22 @@ class Audit {
   }
 
   /**
-   * @param {LH.Audit.Details.Table['headings']} headings
-   * @param {LH.Audit.Details.Table['items']} results
-   * @param {LH.Audit.Details.Table['summary']=} summary
-   * @return {LH.Audit.Details.Table}
+   * @param {typeof Audit} audit
+   * @param {string} errorMessage
+   * @return {LH.Audit.Result}
+   */
+  static generateErrorAuditResult(audit, errorMessage) {
+    return Audit.generateAuditResult(audit, {
+      rawValue: null,
+      errorMessage,
+    });
+  }
+
+  /**
+   * @param {Array<LH.Audit.Heading>} headings
+   * @param {Array<Object<string, LH.Audit.DetailsItem>>} results
+   * @param {LH.Audit.DetailsRendererDetailsSummary=} summary
+   * @return {LH.Audit.DetailsRendererDetailsJSON}
    */
   static makeTableDetails(headings, results, summary) {
     if (results.length === 0) {
@@ -114,77 +126,11 @@ class Audit {
   }
 
   /**
-   * @param {LH.Audit.Details.List['items']} items
-   * @returns {LH.Audit.Details.List}
-   */
-  static makeListDetails(items) {
-    return {
-      type: 'list',
-      items: items,
-    };
-  }
-
-  /** @typedef {{
-   * content: string;
-   * title: string;
-   * lineMessages: LH.Audit.Details.SnippetValue['lineMessages'];
-   * generalMessages: LH.Audit.Details.SnippetValue['generalMessages'];
-   * node?: LH.Audit.Details.NodeValue;
-   * maxLineLength?: number;
-   * maxLinesAroundMessage?: number;
-   * }} SnippetInfo */
-  /**
-   * @param {SnippetInfo} snippetInfo
-   * @return {LH.Audit.Details.SnippetValue}
-   */
-  static makeSnippetDetails({
-    content,
-    title,
-    lineMessages,
-    generalMessages,
-    node,
-    maxLineLength = 200,
-    maxLinesAroundMessage = 20,
-  }) {
-    const allLines = Audit._makeSnippetLinesArray(content, maxLineLength);
-    const lines = Util.filterRelevantLines(allLines, lineMessages, maxLinesAroundMessage);
-    return {
-      type: 'snippet',
-      lines,
-      title,
-      lineMessages,
-      generalMessages,
-      lineCount: allLines.length,
-      node,
-    };
-  }
-
-  /**
-   * @param {string} content
-   * @param {number} maxLineLength
-   * @returns {LH.Audit.Details.SnippetValue['lines']}
-   */
-  static _makeSnippetLinesArray(content, maxLineLength) {
-    return content.split('\n').map((line, lineIndex) => {
-      const lineNumber = lineIndex + 1;
-      /** @type LH.Audit.Details.SnippetValue['lines'][0] */
-      const lineDetail = {
-        content: line.slice(0, maxLineLength),
-        lineNumber,
-      };
-      if (line.length > maxLineLength) {
-        lineDetail.truncated = true;
-      }
-      return lineDetail;
-    });
-  }
-
-  /**
-   * @param {LH.Audit.Details.Opportunity['headings']} headings
-   * @param {LH.Audit.Details.Opportunity['items']} items
+   * @param {Array<LH.ResultLite.Audit.ColumnHeading>} headings
+   * @param {Array<LH.ResultLite.Audit.WastedBytesDetailsItem>|Array<LH.ResultLite.Audit.WastedTimeDetailsItem>} items
    * @param {number} overallSavingsMs
    * @param {number=} overallSavingsBytes
-   * @return {LH.Audit.Details.Opportunity}
+   * @return {LH.Result.Audit.OpportunityDetails}
    */
   static makeOpportunityDetails(headings, items, overallSavingsMs, overallSavingsBytes) {
     return {
@@ -197,70 +143,61 @@ class Audit {
   }
 
   /**
-   * @param {number|null} score
-   * @param {LH.Audit.ScoreDisplayMode} scoreDisplayMode
-   * @param {string} auditId
-   * @return {number|null}
+   * @param {typeof Audit} audit
+   * @param {LH.Audit.Product} result
+   * @return {{score: number|null, scoreDisplayMode: LH.Audit.ScoreDisplayMode}}
    */
-  static _normalizeAuditScore(score, scoreDisplayMode, auditId) {
-    if (scoreDisplayMode !== Audit.SCORING_MODES.BINARY &&
-        scoreDisplayMode !== Audit.SCORING_MODES.NUMERIC) {
-      return null;
-    }
+  static _normalizeAuditScore(audit, result) {
+    // Cast true/false to 1/0
+    let score = result.score === undefined ? Number(result.rawValue) : result.score;
 
-    // Otherwise, score must be a number in [0, 1].
-    if (score === null || !Number.isFinite(score)) {
-      throw new Error(`Invalid score for ${auditId}: ${score}`);
-    }
-    if (score > 1) throw new Error(`Audit score for ${auditId} is > 1`);
-    if (score < 0) throw new Error(`Audit score for ${auditId} is < 0`);
+    if (!Number.isFinite(score)) throw new Error(`Invalid score: ${score}`);
+    if (score > 1) throw new Error(`Audit score for ${audit.meta.id} is > 1`);
+    if (score < 0) throw new Error(`Audit score for ${audit.meta.id} is < 0`);
 
     score = clampTo2Decimals(score);
 
-    return score;
+    const scoreDisplayMode = audit.meta.scoreDisplayMode || Audit.SCORING_MODES.BINARY;
+
+    return {
+      score,
+      scoreDisplayMode,
+    };
   }
 
   /**
    * @param {typeof Audit} audit
-   * @param {string} errorMessage
+   * @param {LH.Audit.Product} result
    * @return {LH.Audit.Result}
    */
-  static generateErrorAuditResult(audit, errorMessage) {
-    return Audit.generateAuditResult(audit, {
-      score: null,
-      errorMessage,
-    });
-  }
-
-  /**
-   * @param {typeof Audit} audit
-   * @param {LH.Audit.Product} product
-   * @return {LH.Audit.Result}
-   */
-  static generateAuditResult(audit, product) {
-    if (product.score === undefined) {
-      throw new Error('generateAuditResult requires a score');
+  static generateAuditResult(audit, result) {
+    if (typeof result.rawValue === 'undefined') {
+      throw new Error('generateAuditResult requires a rawValue');
     }
 
-    // Default to binary scoring.
-    let scoreDisplayMode = audit.meta.scoreDisplayMode || Audit.SCORING_MODES.BINARY;
+    // TODO(bckenny): cleanup the flow of notApplicable/error/binary/numeric
+    let {score, scoreDisplayMode} = Audit._normalizeAuditScore(audit, result);
 
-    // But override if product contents require it.
-    if (product.errorMessage) {
-      // Error result.
-      scoreDisplayMode = Audit.SCORING_MODES.ERROR;
-    } else if (product.notApplicable) {
-      // Audit was determined to not apply to the page.
+    // If the audit was determined to not apply to the page, set score display mode appropriately
+    if (result.notApplicable) {
       scoreDisplayMode = Audit.SCORING_MODES.NOT_APPLICABLE;
+      result.rawValue = true;
     }
 
-    const score = Audit._normalizeAuditScore(product.score, scoreDisplayMode, audit.meta.id);
+    if (result.errorMessage) {
+      scoreDisplayMode = Audit.SCORING_MODES.ERROR;
+    }
 
     let auditTitle = audit.meta.title;
     if (audit.meta.failureTitle) {
-      if (score !== null && score < Util.PASS_THRESHOLD) {
+      if (Number(score) < Util.PASS_THRESHOLD) {
         auditTitle = audit.meta.failureTitle;
       }
+    }
+
+    if (scoreDisplayMode !== Audit.SCORING_MODES.BINARY &&
+        scoreDisplayMode !== Audit.SCORING_MODES.NUMERIC) {
+      score = null;
     }
 
     return {
@@ -270,14 +207,14 @@ class Audit {
 
       score,
       scoreDisplayMode,
-      numericValue: product.numericValue,
+      rawValue: result.rawValue,
 
-      displayValue: product.displayValue,
-      explanation: product.explanation,
-      errorMessage: product.errorMessage,
-      warnings: product.warnings,
+      displayValue: result.displayValue,
+      explanation: result.explanation,
+      errorMessage: result.errorMessage,
+      warnings: result.warnings,
 
-      details: product.details,
+      details: result.details,
     };
   }
 }

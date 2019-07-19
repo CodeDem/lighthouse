@@ -10,21 +10,7 @@
  * See base class in axe-audit.js for audit() implementation.
  */
 
-const AxeAudit = require('./axe-audit.js');
-const i18n = require('../../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of an accesibility audit that evaluates if all object elements have an alt HTML attribute that describes their contents. This title is descriptive of the successful state and is shown to users when no user action is required. */
-  title: '`<object>` elements have `[alt]` text',
-  /** Title of an accesibility audit that evaluates if all object elements have an alt HTML attribute that describes their contents. This title is descriptive of the failing state and is shown to users when there is a failure that needs to be addressed. */
-  failureTitle: '`<object>` elements do not have `[alt]` text',
-  /** Description of a Lighthouse audit that tells the user *why* they should try to pass. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'Screen readers cannot translate non-text content. Adding alt text to ' +
-      '`<object>` elements helps screen readers convey meaning to users. ' +
-      '[Learn more](https://dequeuniversity.com/rules/axe/3.1/object-alt?application=lighthouse).',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
+const AxeAudit = require('./axe-audit');
 
 class ObjectAlt extends AxeAudit {
   /**
@@ -33,13 +19,14 @@ class ObjectAlt extends AxeAudit {
   static get meta() {
     return {
       id: 'object-alt',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
+      title: '`<object>` elements have `[alt]` text',
+      failureTitle: '`<object>` elements do not have `[alt]` text',
+      description: 'Screen readers cannot translate non-text content. Adding alt text to ' +
+          '`<object>` elements helps screen readers convey meaning to users. ' +
+          '[Learn more](https://dequeuniversity.com/rules/axe/2.2/object-alt?application=lighthouse).',
       requiredArtifacts: ['Accessibility'],
     };
   }
 }
 
 module.exports = ObjectAlt;
-module.exports.UIStrings = UIStrings;

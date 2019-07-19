@@ -7,37 +7,32 @@
 
 /* eslint-env jest */
 
-const ServiceWorkerGather = require('../../../gather/gatherers/service-worker.js');
+const ServiceWorkerGather = require('../../../gather/gatherers/service-worker');
 const assert = require('assert');
+let serviceWorkerGatherer;
 
 describe('service worker gatherer', () => {
-  it('obtains the active service worker registration', async () => {
+  // Reset the Gatherer before each test.
+  beforeEach(() => {
+    serviceWorkerGatherer = new ServiceWorkerGather();
+  });
+
+  it('obtains the active service worker registration', () => {
     const url = 'https://example.com/';
     const versions = [{
-      registrationId: '123',
       status: 'activated',
       scriptURL: url,
     }];
-    const registrations = [{
-      registrationId: '123',
-      scopeUrl: url,
-      isDeleted: false,
-    }];
 
-    const serviceWorkerGatherer = new ServiceWorkerGather();
-    const artifact = await serviceWorkerGatherer.beforePass({
+    return serviceWorkerGatherer.beforePass({
       driver: {
-        async getServiceWorkerVersions() {
-          return {versions};
-        },
-        async getServiceWorkerRegistrations() {
-          return {registrations};
+        getServiceWorkerVersions() {
+          return Promise.resolve({versions});
         },
       },
       url,
+    }).then(artifact => {
+      assert.deepEqual(artifact.versions, versions);
     });
-
-    assert.deepEqual(artifact.versions, versions);
-    assert.deepEqual(artifact.registrations, registrations);
   });
 });

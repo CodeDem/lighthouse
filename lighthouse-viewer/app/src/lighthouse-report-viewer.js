@@ -106,7 +106,7 @@ class LighthouseReportViewer {
 
   /**
    * Basic Lighthouse report JSON validation.
-   * @param {LH.Result} reportJson
+   * @param {LH.ReportResult} reportJson
    * @private
    */
   _validateReportJson(reportJson) {
@@ -132,21 +132,13 @@ class LighthouseReportViewer {
   }
 
   /**
-   * @param {LH.Result} json
+   * @param {LH.ReportResult} json
    * @private
    */
-  // TODO: Really, `json` should really have type `unknown` and
-  // we can have _validateReportJson verify that it's an LH.Result
   _replaceReportHtml(json) {
-    // Allow users to view the runnerResult
-    if ('lhr' in json) {
-      json = /** @type {LH.RunnerResult} */ (json).lhr;
-    }
-
     this._validateReportJson(json);
 
-    // Redirect to old viewer if a v2 report. v3, v4, v5 handled by v5 viewer.
-    if (json.lighthouseVersion.startsWith('2')) {
+    if (!json.lighthouseVersion.startsWith('3')) {
       this._loadInLegacyViewerVersion(json);
       return;
     }
@@ -208,8 +200,8 @@ class LighthouseReportViewer {
   }
 
   /**
-   * Stores v2.x report in IDB, then navigates to legacy viewer in current tab.
-   * @param {LH.Result} reportJson
+   * Stores v2.x report in IDB, then navigates to legacy viewer in current tab
+   * @param {LH.ReportResult} reportJson
    * @private
    */
   _loadInLegacyViewerVersion(reportJson) {
@@ -248,7 +240,7 @@ class LighthouseReportViewer {
 
   /**
    * Saves the current report by creating a gist on GitHub.
-   * @param {LH.Result} reportJson
+   * @param {LH.ReportResult} reportJson
    * @return {Promise<string|void>} id of the created gist.
    * @private
    */
@@ -276,7 +268,6 @@ class LighthouseReportViewer {
    * @private
    */
   _onPaste(e) {
-    if (!e.clipboardData) return;
     e.preventDefault();
 
     // Try paste as gist URL.

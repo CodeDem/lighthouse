@@ -6,13 +6,12 @@
 
 'use strict';
 
-const Audit = require('./audit.js');
-const UnusedBytes = require('./byte-efficiency/byte-efficiency-audit.js');
-const URL = require('../lib/url-shim.js');
+const Audit = require('./audit');
+const UnusedBytes = require('./byte-efficiency/byte-efficiency-audit');
 const i18n = require('../lib/i18n/i18n.js');
-const NetworkRecords = require('../computed/network-records.js');
-const MainResource = require('../computed/main-resource.js');
-const LoadSimulator = require('../computed/load-simulator.js');
+const NetworkRecords = require('../gather/computed/network-records.js');
+const MainResource = require('../gather/computed/main-resource.js');
+const LoadSimulator = require('../gather/computed/load-simulator.js');
 
 // Preconnect establishes a "clean" socket. Chrome's socket manager will keep an unused socket
 // around for 10s. Meaning, the time delta between processing preconnect a request should be <10s,
@@ -29,9 +28,6 @@ const UIStrings = {
   description:
     'Consider adding preconnect or dns-prefetch resource hints to establish early ' +
     `connections to important third-party origins. [Learn more](https://developers.google.com/web/fundamentals/performance/resource-prioritization#preconnect).`,
-  /** A warning message that is shown when the user tried to follow the advice of the audit, but it's not working as expected. Forgetting to set the `crossorigin` HTML attribute, or setting it to an incorrect value, on the link is a common mistake when adding preconnect links. */
-  crossoriginWarning: 'A preconnect <link> was found for "{securityOrigin}" but was not used ' +
-    'by the browser. Check that you are using the `crossorigin` attribute properly.',
 };
 
 const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
@@ -45,7 +41,7 @@ class UsesRelPreconnectAudit extends Audit {
       id: 'uses-rel-preconnect',
       title: str_(UIStrings.title),
       description: str_(UIStrings.description),
-      requiredArtifacts: ['devtoolsLogs', 'URL', 'LinkElements'],
+      requiredArtifacts: ['devtoolsLogs', 'URL'],
       scoreDisplayMode: Audit.SCORING_MODES.NUMERIC,
     };
   }
@@ -89,14 +85,13 @@ class UsesRelPreconnectAudit extends Audit {
    */
   static async audit(artifacts, context) {
     const devtoolsLog = artifacts.devtoolsLogs[UsesRelPreconnectAudit.DEFAULT_PASS];
+    const URL = artifacts.URL;
     const settings = context.settings;
     let maxWasted = 0;
-    /** @type {string[]} */
-    const warnings = [];
 
     const [networkRecords, mainResource, loadSimulator] = await Promise.all([
       NetworkRecords.request(devtoolsLog, context),
-      MainResource.request({devtoolsLog, URL: artifacts.URL}, context),
+      MainResource.request({devtoolsLog, URL}, context),
       LoadSimulator.request({devtoolsLog, settings}, context),
     ]);
 
@@ -129,16 +124,13 @@ class UsesRelPreconnectAudit extends Audit {
         origins.set(securityOrigin, records);
       });
 
-    const preconnectLinks = artifacts.LinkElements.filter(el => el.rel === 'preconnect');
-    const preconnectOrigins = new Set(preconnectLinks.map(link => URL.getOrigin(link.href || '')));
-
     /** @type {Array<{url: string, wastedMs: number}>}*/
     let results = [];
     origins.forEach(records => {
       // Sometimes requests are done simultaneous and the connection has not been made
       // chrome will try to connect for each network record, we get the first record
       const firstRecordOfOrigin = records.reduce((firstRecord, record) => {
-        return (record.startTime < firstRecord.startTime) ? record : firstRecord;
+        return (record.startTime < firstRecord.startTime) ? record: firstRecord;
       });
 
       // Skip the origin if we don't have timing information
@@ -162,12 +154,6 @@ class UsesRelPreconnectAudit extends Audit {
       const wastedMs = Math.min(connectionTime, timeBetweenMainResourceAndDnsStart);
       if (wastedMs < IGNORE_THRESHOLD_IN_MS) return;
 
-      if (preconnectOrigins.has(securityOrigin)) {
-        // Add a warning for any origin the user tried to preconnect to but failed
-        warnings.push(str_(UIStrings.crossoriginWarning, {securityOrigin}));
-        return;
-      }
-
       maxWasted = Math.max(wastedMs, maxWasted);
       results.push({
         url: securityOrigin,
@@ -178,7 +164,7 @@ class UsesRelPreconnectAudit extends Audit {
     results = results
       .sort((a, b) => b.wastedMs - a.wastedMs);
 
-    /** @type {LH.Audit.Details.Opportunity['headings']} */
+    /** @type {LH.Result.Audit.OpportunityDetails['headings']} */
     const headings = [
       {key: 'url', valueType: 'url', label: str_(i18n.UIStrings.columnURL)},
       {key: 'wastedMs', valueType: 'timespanMs', label: str_(i18n.UIStrings.columnWastedMs)},
@@ -188,14 +174,13 @@ class UsesRelPreconnectAudit extends Audit {
 
     return {
       score: UnusedBytes.scoreForWastedMs(maxWasted),
-      numericValue: maxWasted,
+      rawValue: maxWasted,
       displayValue: maxWasted ?
         str_(i18n.UIStrings.displayValueMsSavings, {wastedMs: maxWasted}) :
         '',
       extendedInfo: {
         value: results,
       },
-      warnings,
       details,
     };
   }

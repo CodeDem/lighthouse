@@ -9,9 +9,16 @@ const ImageAspectRatioAudit = require('../../audits/image-aspect-ratio.js');
 const assert = require('assert');
 
 /* eslint-env jest */
+function generateRecord(url = 'https://google.com/logo.png', mimeType = 'image/png') {
+  return {
+    url,
+    mimeType,
+  };
+}
 
-function generateImage(clientSize, naturalSize, props, src = 'https://google.com/logo.png') {
-  const image = {src, mimeType: 'image/png'};
+function generateImage(clientSize, naturalSize, networkRecord, props, src = 'https://google.com/logo.png') {
+  Object.assign(networkRecord || {}, {url: src});
+  const image = {src, networkRecord};
   Object.assign(image, clientSize, naturalSize, props);
   return image;
 }
@@ -21,16 +28,17 @@ describe('Images: aspect-ratio audit', () => {
     const description = `identifies when an image ${condition}`;
     it(description, () => {
       const result = ImageAspectRatioAudit.audit({
-        ImageElements: [
+        ImageUsage: [
           generateImage(
-            {displayedWidth: data.clientSize[0], displayedHeight: data.clientSize[1]},
+            {width: data.clientSize[0], height: data.clientSize[1]},
             {naturalWidth: data.naturalSize[0], naturalHeight: data.naturalSize[1]},
+            generateRecord(),
             data.props
           ),
         ],
       });
 
-      assert.strictEqual(result.score, data.score, 'score does not match');
+      assert.strictEqual(result.rawValue, data.rawValue, 'rawValue does not match');
       if (data.warning) {
         assert.strictEqual(result.warnings[0], data.warning);
       } else {
@@ -39,17 +47,8 @@ describe('Images: aspect-ratio audit', () => {
     });
   }
 
-  testImage('is a css image', {
-    score: 1,
-    clientSize: [1000, 20],
-    naturalSize: [5, 5],
-    props: {
-      isCss: true,
-    },
-  });
-
   testImage('is much larger than natural aspect ratio', {
-    score: 0,
+    rawValue: false,
     clientSize: [800, 500],
     naturalSize: [200, 200],
     props: {
@@ -59,7 +58,7 @@ describe('Images: aspect-ratio audit', () => {
   });
 
   testImage('is a css image and much larger than natural aspect ratio', {
-    score: 1,
+    rawValue: true,
     clientSize: [],
     naturalSize: [200, 200],
     props: {
@@ -69,7 +68,7 @@ describe('Images: aspect-ratio audit', () => {
   });
 
   testImage('is larger than natural aspect ratio', {
-    score: 0,
+    rawValue: false,
     clientSize: [400, 300],
     naturalSize: [200, 200],
     props: {
@@ -79,7 +78,7 @@ describe('Images: aspect-ratio audit', () => {
   });
 
   testImage('uses object-fit and is much smaller than natural aspect ratio', {
-    score: 1,
+    rawValue: true,
     clientSize: [200, 200],
     naturalSize: [800, 500],
     props: {
@@ -89,7 +88,7 @@ describe('Images: aspect-ratio audit', () => {
   });
 
   testImage('is much smaller than natural aspect ratio', {
-    score: 0,
+    rawValue: false,
     clientSize: [200, 200],
     naturalSize: [800, 500],
     props: {
@@ -99,7 +98,7 @@ describe('Images: aspect-ratio audit', () => {
   });
 
   testImage('is smaller than natural aspect ratio', {
-    score: 0,
+    rawValue: false,
     clientSize: [200, 200],
     naturalSize: [400, 300],
     props: {
@@ -109,7 +108,7 @@ describe('Images: aspect-ratio audit', () => {
   });
 
   testImage('is almost the right aspect ratio', {
-    score: 1,
+    rawValue: true,
     clientSize: [412, 36],
     naturalSize: [800, 69],
     props: {
@@ -119,7 +118,7 @@ describe('Images: aspect-ratio audit', () => {
   });
 
   testImage('aspect ratios match', {
-    score: 1,
+    rawValue: true,
     clientSize: [100, 100],
     naturalSize: [300, 300],
     props: {
@@ -129,7 +128,7 @@ describe('Images: aspect-ratio audit', () => {
   });
 
   testImage('has no display sizing information', {
-    score: 1,
+    rawValue: true,
     clientSize: [0, 0],
     naturalSize: [100, 100],
     props: {
@@ -138,10 +137,11 @@ describe('Images: aspect-ratio audit', () => {
     },
   });
 
-  testImage('is placeholder image', {
-    score: 1,
-    clientSize: [300, 220],
-    naturalSize: [1, 1],
+  testImage('has invalid natural sizing information', {
+    rawValue: true,
+    warning: 'Invalid image sizing information https://google.com/logo.png',
+    clientSize: [100, 100],
+    naturalSize: [0, 0],
     props: {
       isCss: false,
       usesObjectFit: false,
@@ -150,12 +150,15 @@ describe('Images: aspect-ratio audit', () => {
 
   it('skips svg images', () => {
     const result = ImageAspectRatioAudit.audit({
-      ImageElements: [
+      ImageUsage: [
         generateImage(
           {width: 150, height: 150},
           {},
           {
+            url: 'https://google.com/logo.png',
             mimeType: 'image/svg+xml',
+          },
+          {
             isCss: false,
             usesObjectFit: false,
           }
@@ -163,7 +166,7 @@ describe('Images: aspect-ratio audit', () => {
       ],
     });
 
-    assert.strictEqual(result.score, 1, 'score does not match');
+    assert.strictEqual(result.rawValue, true, 'rawValue does not match');
     assert.equal(result.warnings.length, 0, 'should not have warnings');
   });
 });

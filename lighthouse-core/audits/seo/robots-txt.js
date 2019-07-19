@@ -12,8 +12,8 @@
  * https://github.com/GoogleChrome/lighthouse/issues/4356#issuecomment-375489925
  */
 
-const Audit = require('../audit.js');
-const URL = require('../../lib/url-shim.js');
+const Audit = require('../audit');
+const URL = require('../../lib/url-shim');
 
 const HTTP_CLIENT_ERROR_CODE_LOW = 400;
 const HTTP_SERVER_ERROR_CODE_LOW = 500;
@@ -31,28 +31,6 @@ const DIRECTIVE_SAFELIST = new Set([
   'request-rate', 'visit-time', 'noindex', // not officially supported, but used in the wild
 ]);
 const SITEMAP_VALID_PROTOCOLS = new Set(['https:', 'http:', 'ftp:']);
-const i18n = require('../../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of a Lighthouse audit that provides detail on the site's robots.txt file. Note: "robots.txt" is a canonical filename and should not be translated. This descriptive title is shown when the robots.txt file is present and configured correctly. */
-  title: 'robots.txt is valid',
-  /** Title of a Lighthouse audit that provides detail on the site's robots.txt file. Note: "robots.txt" is a canonical filename and should not be translated. This descriptive title is shown when the robots.txt file is misconfigured, which makes the page hard or impossible to scan via web crawler. */
-  failureTitle: 'robots.txt is not valid',
-  /** Description of a Lighthouse audit that tells the user *why* they need to have a valid robots.txt file. Note: "robots.txt" is a canonical filename and should not be translated. This is displayed after a user expands the section to see more. No character length limits. */
-  description: 'If your robots.txt file is malformed, crawlers may not be able to understand ' +
-  'how you want your website to be crawled or indexed.',
-  /** Label for the audit identifying that the robots.txt request has returned a specific HTTP status code. Note: "robots.txt" is a canonical filename and should not be translated. "statusCode" will be replaced with a 3 digit integer which represents the status of the HTTP connectiong for this page. */
-  displayValueHttpBadCode: 'request for robots.txt returned HTTP status: {statusCode}',
-  /** [ICU Syntax] Label for the audit identifying the number of errors that occured while validating the robots.txt file. "itemCount" will be replaced by the integer count of errors encountered. */
-  displayValueValidationError: `{itemCount, plural,
-    =1 {1 error found}
-    other {# errors found}
-    }`,
-  /** Explanatory message stating that there was a failure in an audit caused by Lighthouse not being able to download the robots.txt file for the site.  Note: "robots.txt" is a canonical filename and should not be translated. */
-  explanation: 'Lighthouse was unable to download a robots.txt file',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
 
 /**
  * @param {string} directiveName
@@ -183,9 +161,10 @@ class RobotsTxt extends Audit {
   static get meta() {
     return {
       id: 'robots-txt',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
+      title: 'robots.txt is valid',
+      failureTitle: 'robots.txt is not valid',
+      description: 'If your robots.txt file is malformed, crawlers may not be able to understand ' +
+      'how you want your website to be crawled or indexed.',
       requiredArtifacts: ['RobotsTxt'],
     };
   }
@@ -202,19 +181,19 @@ class RobotsTxt extends Audit {
 
     if (!status) {
       return {
-        score: 0,
-        explanation: str_(UIStrings.explanation),
+        rawValue: false,
+        explanation: 'Lighthouse was unable to download your robots.txt file',
       };
     }
 
     if (status >= HTTP_SERVER_ERROR_CODE_LOW) {
       return {
-        score: 0,
-        displayValue: str_(UIStrings.displayValueHttpBadCode, {statusCode: status}),
+        rawValue: false,
+        displayValue: `request for robots.txt returned HTTP${status}`,
       };
     } else if (status >= HTTP_CLIENT_ERROR_CODE_LOW || content === '') {
       return {
-        score: 1,
+        rawValue: true,
         notApplicable: true,
       };
     }
@@ -226,7 +205,6 @@ class RobotsTxt extends Audit {
 
     const validationErrors = validateRobots(content);
 
-    /** @type {LH.Audit.Details.Table['headings']} */
     const headings = [
       {key: 'index', itemType: 'text', text: 'Line #'},
       {key: 'line', itemType: 'code', text: 'Content'},
@@ -237,12 +215,12 @@ class RobotsTxt extends Audit {
     let displayValue;
 
     if (validationErrors.length) {
-      displayValue =
-        str_(UIStrings.displayValueValidationError, {itemCount: validationErrors.length});
+      displayValue = validationErrors.length > 1 ?
+        `${validationErrors.length} errors found` : '1 error found';
     }
 
     return {
-      score: Number(validationErrors.length === 0),
+      rawValue: validationErrors.length === 0,
       details,
       displayValue,
     };
@@ -250,4 +228,3 @@ class RobotsTxt extends Audit {
 }
 
 module.exports = RobotsTxt;
-module.exports.UIStrings = UIStrings;

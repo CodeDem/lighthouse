@@ -5,11 +5,11 @@
  */
 'use strict';
 
-const Audit = require('./audit.js');
-const LHError = require('../lib/lh-error.js');
+const Audit = require('./audit');
+const LHError = require('../lib/lh-error');
 const jpeg = require('jpeg-js');
-const Speedline = require('../computed/speedline.js');
-const Interactive = require('../computed/metrics/interactive.js');
+const Speedline = require('../gather/computed/speedline.js');
+const Interactive = require('../gather/computed/metrics/interactive.js');
 
 const NUMBER_OF_THUMBNAILS = 10;
 const THUMBNAIL_WIDTH = 120;
@@ -116,11 +116,9 @@ class ScreenshotThumbnails extends Audit {
           }
         });
       }
-
       let base64Data;
-      const cachedThumbnail = cachedThumbnails.get(frameForTimestamp);
-      if (cachedThumbnail) {
-        base64Data = cachedThumbnail;
+      if (cachedThumbnails.has(frameForTimestamp)) {
+        base64Data = cachedThumbnails.get(frameForTimestamp);
       } else {
         const imageData = frameForTimestamp.getParsedImage();
         const thumbnailImageData = ScreenshotThumbnails.scaleImageToThumbnail(imageData);
@@ -130,12 +128,13 @@ class ScreenshotThumbnails extends Audit {
       thumbnails.push({
         timing: Math.round(targetTimestamp - speedline.beginning),
         timestamp: targetTimestamp * 1000,
-        data: `data:image/jpeg;base64,${base64Data}`,
+        data: base64Data,
       });
     }
 
     return {
       score: 1,
+      rawValue: thumbnails.length > 0,
       details: {
         type: 'filmstrip',
         scale: timelineEnd,

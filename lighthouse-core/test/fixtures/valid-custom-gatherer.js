@@ -6,7 +6,7 @@
 
 'use strict';
 
-const LighthouseGatherer = require('../../gather/gatherers/gatherer.js');
+const LighthouseGatherer = require('../../gather/gatherers/gatherer');
 
 class CustomGatherer extends LighthouseGatherer {}
 

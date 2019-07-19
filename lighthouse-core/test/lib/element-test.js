@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const Element = require('../../lib/element.js');
+const Element = require('../../lib/element');
 const assert = require('assert');
 
 class DriverStub {

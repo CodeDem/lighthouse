@@ -5,11 +5,11 @@
  */
 'use strict';
 
-const Gatherer = require('../gatherer.js');
+const Gatherer = require('../gatherer');
 
 class AppCacheManifest extends Gatherer {
   /**
-   * Returns the value of the html element's manifest attribute or null if it
+   * Retrurns the value of the html element's manifest attribute or null if it
    * is not defined.
    * @param {LH.Gatherer.PassContext} passContext
    * @return {Promise<LH.Artifacts['AppCacheManifest']>}

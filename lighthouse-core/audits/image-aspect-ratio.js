@@ -11,31 +11,12 @@
  */
 'use strict';
 
-const Audit = require('./audit.js');
-const URL = require('../lib/url-shim.js');
-const i18n = require('../lib/i18n/i18n.js');
+const Audit = require('./audit');
 
-const UIStrings = {
-  /** Title of a Lighthouse audit that provides detail on the aspect ratios of all images on the page. This descriptive title is shown to users when all images use correct aspect ratios. */
-  title: 'Displays images with correct aspect ratio',
-  /** Title of a Lighthouse audit that provides detail on the aspect ratios of all images on the page. This descriptive title is shown to users when not all images use correct aspect ratios. */
-  failureTitle: 'Displays images with incorrect aspect ratio',
-  /** Description of a Lighthouse audit that tells the user why they should maintain the correct aspect ratios for all images. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'Image display dimensions should match natural aspect ratio. ' +
-    '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/aspect-ratio).',
-  /** Warning that the size information for an image was nonsensical. `url` will be replaced with the url of that image. */
-  warningCompute: 'Invalid image sizing information {url}',
-  /**  Label for a column in a data table; entries in the column will be the numeric aspect ratio of an image as displayed in a web page. */
-  columnDisplayed: 'Aspect Ratio (Displayed)',
-  /**  Label for a column in a data table; entries in the column will be the numeric aspect ratio of the raw (actual) image. */
-  columnActual: 'Aspect Ratio (Actual)',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
-
+const URL = require('../lib/url-shim');
 const THRESHOLD_PX = 2;
 
-/** @typedef {Required<LH.Artifacts.ImageElement>} WellDefinedImage */
+/** @typedef {Required<LH.Artifacts.SingleImageUsage>} WellDefinedImage */
 
 class ImageAspectRatio extends Audit {
   /**
@@ -44,10 +25,11 @@ class ImageAspectRatio extends Audit {
   static get meta() {
     return {
       id: 'image-aspect-ratio',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
-      requiredArtifacts: ['ImageElements'],
+      title: 'Displays images with correct aspect ratio',
+      failureTitle: 'Displays images with incorrect aspect ratio',
+      description: 'Image display dimensions should match natural aspect ratio. ' +
+        '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/aspect-ratio).',
+      requiredArtifacts: ['ImageUsage'],
     };
   }
 
@@ -58,19 +40,19 @@ class ImageAspectRatio extends Audit {
   static computeAspectRatios(image) {
     const url = URL.elideDataURI(image.src);
     const actualAspectRatio = image.naturalWidth / image.naturalHeight;
-    const displayedAspectRatio = image.displayedWidth / image.displayedHeight;
+    const displayedAspectRatio = image.width / image.height;
 
-    const targetDisplayHeight = image.displayedWidth / actualAspectRatio;
-    const doRatiosMatch = Math.abs(targetDisplayHeight - image.displayedHeight) < THRESHOLD_PX;
+    const targetDisplayHeight = image.width / actualAspectRatio;
+    const doRatiosMatch = Math.abs(targetDisplayHeight - image.height) < THRESHOLD_PX;
 
     if (!Number.isFinite(actualAspectRatio) ||
       !Number.isFinite(displayedAspectRatio)) {
-      return new Error(str_(UIStrings.warningCompute, {url}));
+      return new Error(`Invalid image sizing information ${url}`);
     }
 
     return {
       url,
-      displayedAspectRatio: `${image.displayedWidth} x ${image.displayedHeight}
+      displayedAspectRatio: `${image.width} x ${image.height}
         (${displayedAspectRatio.toFixed(2)})`,
       actualAspectRatio: `${image.naturalWidth} x ${image.naturalHeight}
         (${actualAspectRatio.toFixed(2)})`,
@@ -83,25 +65,20 @@ class ImageAspectRatio extends Audit {
    * @return {LH.Audit.Product}
    */
   static audit(artifacts) {
-    const images = artifacts.ImageElements;
+    const images = artifacts.ImageUsage;
 
     /** @type {string[]} */
     const warnings = [];
     /** @type {Array<{url: string, displayedAspectRatio: string, actualAspectRatio: string, doRatiosMatch: boolean}>} */
     const results = [];
     images.filter(image => {
-      // - filter out css background images since we don't have a reliable way to tell if it's a
-      //   sprite sheet, repeated for effect, etc
       // - filter out images that don't have following properties:
       //   networkRecord, width, height, images that use `object-fit`: `cover` or `contain`
       // - filter all svgs as they have no natural dimensions to audit
-      return !image.isCss &&
-        image.mimeType &&
-        image.mimeType !== 'image/svg+xml' &&
-        image.naturalHeight > 5 &&
-        image.naturalWidth > 5 &&
-        image.displayedWidth &&
-        image.displayedHeight &&
+      return image.networkRecord &&
+        image.networkRecord.mimeType !== 'image/svg+xml' &&
+        image.width &&
+        image.height &&
         !image.usesObjectFit;
     }).forEach(image => {
       const wellDefinedImage = /** @type {WellDefinedImage} */ (image);
@@ -114,16 +91,15 @@ class ImageAspectRatio extends Audit {
       if (!processed.doRatiosMatch) results.push(processed);
     });
 
-    /** @type {LH.Audit.Details.Table['headings']} */
     const headings = [
       {key: 'url', itemType: 'thumbnail', text: ''},
-      {key: 'url', itemType: 'url', text: str_(i18n.UIStrings.columnURL)},
-      {key: 'displayedAspectRatio', itemType: 'text', text: str_(UIStrings.columnDisplayed)},
-      {key: 'actualAspectRatio', itemType: 'text', text: str_(UIStrings.columnActual)},
+      {key: 'url', itemType: 'url', text: 'URL'},
+      {key: 'displayedAspectRatio', itemType: 'text', text: 'Aspect Ratio (Displayed)'},
+      {key: 'actualAspectRatio', itemType: 'text', text: 'Aspect Ratio (Actual)'},
     ];
 
     return {
-      score: Number(results.length === 0),
+      rawValue: results.length === 0,
       warnings,
       details: Audit.makeTableDetails(headings, results),
     };
@@ -131,4 +107,3 @@ class ImageAspectRatio extends Audit {
 }
 
 module.exports = ImageAspectRatio;
-module.exports.UIStrings = UIStrings;

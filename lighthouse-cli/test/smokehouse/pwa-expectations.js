@@ -23,131 +23,115 @@ const pwaDetailsExpectations = {
  */
 module.exports = [
   {
-    lhr: {
-      requestedUrl: 'https://airhorner.com',
-      finalUrl: 'https://airhorner.com/',
-      audits: {
-        'is-on-https': {
-          score: 1,
-        },
-        'redirects-http': {
-          score: 1,
-        },
-        'service-worker': {
-          score: 1,
-        },
-        'works-offline': {
-          score: 1,
-        },
-        'offline-start-url': {
-          score: 1,
-        },
-        'viewport': {
-          score: 1,
-        },
-        'without-javascript': {
-          score: 1,
-        },
-        'load-fast-enough-for-pwa': {
+    requestedUrl: 'https://airhorner.com',
+    finalUrl: 'https://airhorner.com/',
+    audits: {
+      'is-on-https': {
+        score: 1,
+      },
+      'redirects-http': {
+        score: 1,
+      },
+      'service-worker': {
+        score: 1,
+      },
+      'works-offline': {
+        score: 1,
+      },
+      'viewport': {
+        score: 1,
+      },
+      'without-javascript': {
+        score: 1,
+      },
+      'load-fast-enough-for-pwa': {
         // Ignore speed test; just verify that it ran.
-        },
-        'installable-manifest': {
-          score: 1,
-          details: {items: [pwaDetailsExpectations]},
-        },
-        'splash-screen': {
-          score: 1,
-          details: {items: [pwaDetailsExpectations]},
-        },
-        'themed-omnibox': {
-          score: 1,
-          details: {items: [{...pwaDetailsExpectations, themeColor: '#2196F3'}]},
-        },
-        'content-width': {
-          score: 1,
-        },
-        'apple-touch-icon': {
-          score: 1,
-        },
+      },
+      'webapp-install-banner': {
+        score: 1,
+        details: {items: [pwaDetailsExpectations]},
+      },
+      'splash-screen': {
+        score: 1,
+        details: {items: [pwaDetailsExpectations]},
+      },
+      'themed-omnibox': {
+        score: 1,
+        details: {items: [{...pwaDetailsExpectations, themeColor: '#2196F3'}]},
+      },
+      'content-width': {
+        score: 1,
+      },
 
-        // "manual" audits. Just verify in the results.
-        'pwa-cross-browser': {
-          score: null,
-          scoreDisplayMode: 'manual',
-        },
-        'pwa-page-transitions': {
-          score: null,
-          scoreDisplayMode: 'manual',
-        },
-        'pwa-each-page-has-url': {
-          score: null,
-          scoreDisplayMode: 'manual',
-        },
+      // "manual" audits. Just verify in the results.
+      'pwa-cross-browser': {
+        score: null,
+        scoreDisplayMode: 'manual',
+      },
+      'pwa-page-transitions': {
+        score: null,
+        scoreDisplayMode: 'manual',
+      },
+      'pwa-each-page-has-url': {
+        score: null,
+        scoreDisplayMode: 'manual',
       },
     },
   },
 
   {
-    lhr: {
-      requestedUrl: 'https://www.chromestatus.com/',
-      finalUrl: 'https://www.chromestatus.com/features',
-      audits: {
-        'is-on-https': {
-          score: 1,
-        },
-        'redirects-http': {
-          score: 1,
-        },
-        'service-worker': {
-          score: 1,
-        },
-        'works-offline': {
-          score: 0,
-        },
-        'offline-start-url': {
-          score: 1,
-        },
-        'viewport': {
-          score: 1,
-        },
-        'without-javascript': {
-          score: 1,
-        },
-        'load-fast-enough-for-pwa': {
+    requestedUrl: 'https://www.chromestatus.com/',
+    finalUrl: 'https://www.chromestatus.com/features',
+    audits: {
+      'is-on-https': {
+        score: 1,
+      },
+      'redirects-http': {
+        score: 1,
+      },
+      'service-worker': {
+        score: 1,
+      },
+      'works-offline': {
+        score: 0,
+      },
+      'viewport': {
+        score: 1,
+      },
+      'without-javascript': {
+        score: 1,
+      },
+      'load-fast-enough-for-pwa': {
         // Ignore speed test; just verify that it ran.
-        },
-        'installable-manifest': {
-          score: 1,
-          details: {items: [pwaDetailsExpectations]},
-        },
-        'splash-screen': {
-          score: 1,
-          details: {items: [pwaDetailsExpectations]},
-        },
-        'themed-omnibox': {
-          score: 1,
-          details: {items: [pwaDetailsExpectations]},
-        },
-        'content-width': {
-          score: 1,
-        },
-        'apple-touch-icon': {
-          score: 1,
-        },
+      },
+      'webapp-install-banner': {
+        score: 1,
+        details: {items: [pwaDetailsExpectations]},
+      },
+      'splash-screen': {
+        score: 1,
+        details: {items: [pwaDetailsExpectations]},
+      },
+      'themed-omnibox': {
+        score: 1,
+        details: {items: [pwaDetailsExpectations]},
+      },
+      'content-width': {
+        score: 1,
+      },
 
-        // "manual" audits. Just verify in the results.
-        'pwa-cross-browser': {
-          score: null,
-          scoreDisplayMode: 'manual',
-        },
-        'pwa-page-transitions': {
-          score: null,
-          scoreDisplayMode: 'manual',
-        },
-        'pwa-each-page-has-url': {
-          score: null,
-          scoreDisplayMode: 'manual',
-        },
+      // "manual" audits. Just verify in the results.
+      'pwa-cross-browser': {
+        score: null,
+        scoreDisplayMode: 'manual',
+      },
+      'pwa-page-transitions': {
+        score: null,
+        scoreDisplayMode: 'manual',
+      },
+      'pwa-each-page-has-url': {
+        score: null,
+        scoreDisplayMode: 'manual',
       },
     },
   },

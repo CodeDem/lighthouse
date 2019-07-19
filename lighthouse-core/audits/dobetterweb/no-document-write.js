@@ -10,21 +10,7 @@
 
 'use strict';
 
-const ViolationAudit = require('../violation-audit.js');
-const i18n = require('../../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of a Lighthouse audit that provides detail on the page's use of the `document.write` API. This descriptive title is shown to users when the page does not use `document.write`. */
-  title: 'Avoids `document.write()`',
-  /** Title of a Lighthouse audit that provides detail on the page's use of the `document.write` API. This descriptive title is shown to users when the page does use `document.write`. */
-  failureTitle: 'Uses `document.write()`',
-  /** Description of a Lighthouse audit that tells the user why they should avoid `document.write`. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'For users on slow connections, external scripts dynamically injected via ' +
-      '`document.write()` can delay page load by tens of seconds. ' +
-      '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/document-write).',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
+const ViolationAudit = require('../violation-audit');
 
 class NoDocWriteAudit extends ViolationAudit {
   /**
@@ -33,10 +19,12 @@ class NoDocWriteAudit extends ViolationAudit {
   static get meta() {
     return {
       id: 'no-document-write',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
-      requiredArtifacts: ['ConsoleMessages'],
+      title: 'Avoids `document.write()`',
+      failureTitle: 'Uses `document.write()`',
+      description: 'For users on slow connections, external scripts dynamically injected via ' +
+          '`document.write()` can delay page load by tens of seconds. ' +
+          '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/document-write).',
+      requiredArtifacts: ['ChromeConsoleMessages'],
     };
   }
 
@@ -47,16 +35,15 @@ class NoDocWriteAudit extends ViolationAudit {
   static audit(artifacts) {
     const results = ViolationAudit.getViolationResults(artifacts, /document\.write/);
 
-    /** @type {LH.Audit.Details.Table['headings']} */
     const headings = [
-      {key: 'url', itemType: 'url', text: str_(i18n.UIStrings.columnURL)},
-      {key: 'label', itemType: 'text', text: str_(i18n.UIStrings.columnLocation)},
+      {key: 'url', itemType: 'url', text: 'URL'},
+      {key: 'label', itemType: 'text', text: 'Location'},
     ];
     // TODO(bckenny): see TODO in geolocation-on-start
     const details = ViolationAudit.makeTableDetails(headings, results);
 
     return {
-      score: Number(results.length === 0),
+      rawValue: results.length === 0,
       extendedInfo: {
         value: results,
       },
@@ -66,4 +53,3 @@ class NoDocWriteAudit extends ViolationAudit {
 }
 
 module.exports = NoDocWriteAudit;
-module.exports.UIStrings = UIStrings;

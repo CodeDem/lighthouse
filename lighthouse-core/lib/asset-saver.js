@@ -9,13 +9,11 @@ const fs = require('fs');
 const path = require('path');
 const log = require('lighthouse-logger');
 const stream = require('stream');
-const Simulator = require('./dependency-graph/simulator/simulator.js');
-const lanternTraceSaver = require('./lantern-trace-saver.js');
-const Metrics = require('./traces/pwmetrics-events.js');
+const Simulator = require('./dependency-graph/simulator/simulator');
+const lanternTraceSaver = require('./lantern-trace-saver');
+const Metrics = require('./traces/pwmetrics-events');
 const rimraf = require('rimraf');
 const mkdirp = require('mkdirp');
-const NetworkAnalysisComputed = require('../computed/network-analysis.js');
-const LoadSimulatorComputed = require('../computed/load-simulator.js');
 
 const artifactsFilename = 'artifacts.json';
 const traceSuffix = '.trace.json';
@@ -33,9 +31,9 @@ const devtoolsLogSuffix = '.devtoolslog.json';
  * Load artifacts object from files located within basePath
  * Also save the traces to their own files
  * @param {string} basePath
- * @return {LH.Artifacts}
+ * @return {Promise<LH.Artifacts>}
  */
-function loadArtifacts(basePath) {
+async function loadArtifacts(basePath) {
   log.log('Reading artifacts from disk:', basePath);
 
   if (!fs.existsSync(basePath)) {
@@ -65,11 +63,6 @@ function loadArtifacts(basePath) {
     artifacts.traces[passName] = Array.isArray(trace) ? {traceEvents: trace} : trace;
   });
 
-  if (Array.isArray(artifacts.Timing)) {
-    // Any Timing entries in saved artifacts will have a different timeOrigin than the auditing phase
-    // The `gather` prop is read later in generate-timing-trace and they're added to a separate track of trace events
-    artifacts.Timing.forEach(entry => (entry.gather = true));
-  }
   return artifacts;
 }
 
@@ -81,8 +74,6 @@ function loadArtifacts(basePath) {
  * @return {Promise<void>}
  */
 async function saveArtifacts(artifacts, basePath) {
-  const status = {msg: 'Saving artifacts', id: 'lh:assetSaver:saveArtifacts'};
-  log.time(status);
   mkdirp.sync(basePath);
   rimraf.sync(`${basePath}/*${traceSuffix}`);
   rimraf.sync(`${basePath}/${artifactsFilename}`);
@@ -104,7 +95,6 @@ async function saveArtifacts(artifacts, basePath) {
   const restArtifactsString = JSON.stringify(restArtifacts, null, 2);
   fs.writeFileSync(`${basePath}/${artifactsFilename}`, restArtifactsString, 'utf8');
   log.log('Artifacts saved to disk in folder:', basePath);
-  log.timeEnd(status);
 }
 
 /**
@@ -139,8 +129,9 @@ async function prepareAssets(artifacts, audits) {
 }
 
 /**
- * Generates a JSON representation of traceData line-by-line for a nicer printed
- * version with one trace event per line.
+ * Generates a JSON representation of traceData line-by-line to avoid OOM due to very large traces.
+ * COMPAT: As of Node 9, JSON.parse/stringify can handle 256MB+ strings. Once we drop support for
+ * Node 8, we can 'revert' PR #2593. See https://stackoverflow.com/a/47781288/89484
  * @param {LH.Trace} traceData
  * @return {IterableIterator<string>}
  */
@@ -252,16 +243,25 @@ async function saveAssets(artifacts, audits, pathWithBasename) {
 }
 
 /**
- * @param {LH.DevtoolsLog} devtoolsLog
- * @param {string} outputPath
+ * Log trace(s) and associated devtoolsLog(s) to console.
+ * @param {LH.Artifacts} artifacts
+ * @param {LH.Audit.Results} audits
  * @return {Promise<void>}
  */
-async function saveLanternNetworkData(devtoolsLog, outputPath) {
-  const context = /** @type {LH.Audit.Context} */ ({computedCache: new Map()});
-  const networkAnalysis = await NetworkAnalysisComputed.request(devtoolsLog, context);
-  const lanternData = LoadSimulatorComputed.convertAnalysisToSaveableLanternData(networkAnalysis);
-
-  fs.writeFileSync(outputPath, JSON.stringify(lanternData));
+async function logAssets(artifacts, audits) {
+  const allAssets = await prepareAssets(artifacts, audits);
+  allAssets.map(passAssets => {
+    const dtlogdata = JSON.stringify(passAssets.devtoolsLog);
+    // eslint-disable-next-line no-console
+    console.log(`loggedAsset %%% devtoolslog-${passAssets.passName}.json %%% ${dtlogdata}`);
+    const traceIter = traceJsonGenerator(passAssets.traceData);
+    let traceJson = '';
+    for (const trace of traceIter) {
+      traceJson += trace;
+    }
+    // eslint-disable-next-line no-console
+    console.log(`loggedAsset %%% trace-${passAssets.passName}.json %%% ${traceJson}`);
+  });
 }
 
 module.exports = {
@@ -270,5 +270,5 @@ module.exports = {
   saveAssets,
   prepareAssets,
   saveTrace,
-  saveLanternNetworkData,
+  logAssets,
 };

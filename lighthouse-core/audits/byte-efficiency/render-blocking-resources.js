@@ -9,15 +9,15 @@
  */
 'use strict';
 
-const Audit = require('../audit.js');
+const Audit = require('../audit');
 const i18n = require('../../lib/i18n/i18n.js');
-const BaseNode = require('../../lib/dependency-graph/base-node.js');
-const ByteEfficiencyAudit = require('./byte-efficiency-audit.js');
-const UnusedCSS = require('./unused-css-rules.js');
-const NetworkRequest = require('../../lib/network-request.js');
-const TraceOfTab = require('../../computed/trace-of-tab.js');
-const LoadSimulator = require('../../computed/load-simulator.js');
-const FirstContentfulPaint = require('../../computed/metrics/first-contentful-paint.js');
+const BaseNode = require('../../lib/dependency-graph/base-node');
+const ByteEfficiencyAudit = require('./byte-efficiency-audit');
+const UnusedCSS = require('./unused-css-rules');
+const NetworkRequest = require('../../lib/network-request');
+const TraceOfTab = require('../../gather/computed/trace-of-tab.js');
+const LoadSimulator = require('../../gather/computed/load-simulator.js');
+const FirstContentfulPaint = require('../../gather/computed/metrics/first-contentful-paint.js');
 
 /** @typedef {import('../../lib/dependency-graph/simulator/simulator')} Simulator */
 /** @typedef {import('../../lib/dependency-graph/base-node.js').Node} Node */
@@ -70,9 +70,10 @@ class RenderBlockingResources extends Audit {
       title: str_(UIStrings.title),
       scoreDisplayMode: Audit.SCORING_MODES.NUMERIC,
       description: str_(UIStrings.description),
-      // TODO: look into adding an `optionalArtifacts` property that captures the non-required nature
-      // of CSSUsage
-      requiredArtifacts: ['URL', 'TagsBlockingFirstPaint', 'traces', 'devtoolsLogs', 'CSSUsage'],
+      // This audit also looks at CSSUsage but has a graceful fallback if it failed, so do not mark
+      // it as a "requiredArtifact".
+      // TODO: look into adding an `optionalArtifacts` property that captures this
+      requiredArtifacts: ['URL', 'TagsBlockingFirstPaint', 'traces'],
     };
   }
 
@@ -102,12 +103,14 @@ class RenderBlockingResources extends Audit {
     for (const resource of artifacts.TagsBlockingFirstPaint) {
       // Ignore any resources that finished after observed FCP (they're clearly not render-blocking)
       if (resource.endTime * 1000 > fcpTsInMs) continue;
-      // TODO: beacon to Sentry, https://github.com/GoogleChrome/lighthouse/issues/7041
+      // TODO(phulce): beacon these occurences to Sentry to improve FCP graph
       if (!nodesByUrl[resource.tag.url]) continue;
 
       const {node, nodeTiming} = nodesByUrl[resource.tag.url];
 
       // Mark this node and all its dependents as deferrable
+      // TODO(phulce): make this slightly more surgical
+      // i.e. the referenced font asset won't become inlined just because you inline the CSS
       node.traverse(node => deferredNodeIds.add(node.id));
 
       // "wastedMs" is the download time of the network request, responseReceived - requestSent
@@ -187,11 +190,11 @@ class RenderBlockingResources extends Audit {
   static async computeWastedCSSBytes(artifacts, context) {
     const wastedBytesByUrl = new Map();
     try {
+      // TODO(phulce): pull this out into computed artifact
       const results = await UnusedCSS.audit(artifacts, context);
-      if (results.details && results.details.type === 'opportunity') {
-        for (const item of results.details.items) {
-          wastedBytesByUrl.set(item.url, item.wastedBytes);
-        }
+      // @ts-ignore - TODO(bckenny): details types.
+      for (const item of results.details.items) {
+        wastedBytesByUrl.set(item.url, item.wastedBytes);
       }
     } catch (_) {}
 
@@ -211,7 +214,7 @@ class RenderBlockingResources extends Audit {
       displayValue = str_(i18n.UIStrings.displayValueMsSavings, {wastedMs});
     }
 
-    /** @type {LH.Audit.Details.Opportunity['headings']} */
+    /** @type {LH.Result.Audit.OpportunityDetails['headings']} */
     const headings = [
       {key: 'url', valueType: 'url', label: str_(i18n.UIStrings.columnURL)},
       {key: 'totalBytes', valueType: 'bytes', label: str_(i18n.UIStrings.columnSize)},
@@ -223,7 +226,7 @@ class RenderBlockingResources extends Audit {
     return {
       displayValue,
       score: ByteEfficiencyAudit.scoreForWastedMs(wastedMs),
-      numericValue: wastedMs,
+      rawValue: wastedMs,
       details,
     };
   }

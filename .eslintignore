@@ -5,8 +5,13 @@
 **/node_modules/**
 **/third_party/**
 
-/dist/**
+**/dist/**
+lighthouse-extension/app/scripts
 
+**/closure/*/*
 coverage/**
+
+# Generated files
+plots/out*
 
 !.eslintrc.js

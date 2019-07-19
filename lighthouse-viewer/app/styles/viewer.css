@@ -116,11 +116,11 @@
 }
 
 /* open-in-viewer option hidden in Viewer */
-.lh-tools__dropdown .lh-tools--viewer {
+.lh-export__dropdown .lh-export--viewer {
   display: none;
 }
 
 /* open-in-gist option visible in Viewer */
-.lh-tools__dropdown .lh-tools--gist {
+.lh-export__dropdown .lh-export--gist {
   display: block !important;
 }

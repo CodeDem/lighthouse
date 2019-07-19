@@ -5,30 +5,16 @@
  */
 'use strict';
 
-const Audit = require('../audit.js');
+const Audit = require('../audit');
 const robotsParser = require('robots-parser');
-const URL = require('../../lib/url-shim.js');
-const MainResource = require('../../computed/main-resource.js');
+const URL = require('../../lib/url-shim');
+const MainResource = require('../../gather/computed/main-resource.js');
 const BLOCKLIST = new Set([
   'noindex',
   'none',
 ]);
 const ROBOTS_HEADER = 'x-robots-tag';
 const UNAVAILABLE_AFTER = 'unavailable_after';
-const i18n = require('../../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of a Lighthouse audit that provides detail on if search-engine crawlers are blocked from indexing the page. This title is shown when the page is not blocked from indexing and can be crawled. */
-  title: 'Page isn’t blocked from indexing',
-  /** Title of a Lighthouse audit that provides detail on if search-engine crawlers are blocked from indexing the page. This title is shown when the page has been configured to block indexing and therefore cannot be indexed by search engines. */
-  failureTitle: 'Page is blocked from indexing',
-  /** Description of a Lighthouse audit that tells the user *why* allowing search-engine crawling of their page is beneficial. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'Search engines are unable to include your pages in search results ' +
-      'if they don\'t have permission to crawl them. [Learn ' +
-      'more](https://developers.google.com/web/tools/lighthouse/audits/indexing).',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
 
 /**
  * Checks if given directive is a valid unavailable_after directive with a date in the past
@@ -78,10 +64,12 @@ class IsCrawlable extends Audit {
   static get meta() {
     return {
       id: 'is-crawlable',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
-      requiredArtifacts: ['MetaElements', 'RobotsTxt', 'URL', 'devtoolsLogs'],
+      title: 'Page isn’t blocked from indexing',
+      failureTitle: 'Page is blocked from indexing',
+      description: 'Search engines are unable to include your pages in search results ' +
+          'if they don\'t have permission to crawl them. [Learn ' +
+          'more](https://developers.google.com/web/tools/lighthouse/audits/indexing).',
+      requiredArtifacts: ['MetaRobots', 'RobotsTxt', 'URL'],
     };
   }
 
@@ -92,22 +80,20 @@ class IsCrawlable extends Audit {
    */
   static audit(artifacts, context) {
     const devtoolsLog = artifacts.devtoolsLogs[Audit.DEFAULT_PASS];
-    const metaRobots = artifacts.MetaElements.find(meta => meta.name === 'robots');
 
     return MainResource.request({devtoolsLog, URL: artifacts.URL}, context)
       .then(mainResource => {
-        /** @type {LH.Audit.Details.Table['items']} */
+        /** @type {Array<Object<string, LH.Audit.DetailsItem>>} */
         const blockingDirectives = [];
 
-        if (metaRobots) {
-          const metaRobotsContent = metaRobots.content || '';
-          const isBlocking = hasBlockingDirective(metaRobotsContent);
+        if (artifacts.MetaRobots) {
+          const isBlocking = hasBlockingDirective(artifacts.MetaRobots);
 
           if (isBlocking) {
             blockingDirectives.push({
               source: {
                 type: /** @type {'node'} */ ('node'),
-                snippet: `<meta name="robots" content="${metaRobotsContent}" />`,
+                snippet: `<meta name="robots" content="${artifacts.MetaRobots}" />`,
               },
             });
           }
@@ -132,14 +118,13 @@ class IsCrawlable extends Audit {
           }
         }
 
-        /** @type {LH.Audit.Details.Table['headings']} */
         const headings = [
           {key: 'source', itemType: 'code', text: 'Blocking Directive Source'},
         ];
         const details = Audit.makeTableDetails(headings, blockingDirectives);
 
         return {
-          score: Number(blockingDirectives.length === 0),
+          rawValue: blockingDirectives.length === 0,
           details,
         };
       });
@@ -147,4 +132,3 @@ class IsCrawlable extends Audit {
 }
 
 module.exports = IsCrawlable;
-module.exports.UIStrings = UIStrings;

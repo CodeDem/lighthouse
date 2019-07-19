@@ -9,7 +9,7 @@
  * @fileoverview Base class for boolean audits that can have multiple reasons for failure
  */
 
-const Audit = require('./audit.js');
+const Audit = require('./audit');
 
 class MultiCheckAudit extends Audit {
   /**
@@ -23,7 +23,7 @@ class MultiCheckAudit extends Audit {
   }
 
   /**
-   * @param {{failures: Array<string>, manifestValues?: LH.Artifacts.ManifestValues}} result
+   * @param {{failures: Array<string>, warnings?: Array<string>, manifestValues?: LH.Artifacts.ManifestValues}} result
    * @return {LH.Audit.Product}
    */
   static createAuditProduct(result) {
@@ -32,6 +32,7 @@ class MultiCheckAudit extends Audit {
       ...result,
       ...result.manifestValues,
       manifestValues: undefined,
+      warnings: undefined,
       allChecks: undefined,
     };
 
@@ -41,18 +42,12 @@ class MultiCheckAudit extends Audit {
       });
     }
 
-    // Include the detailed pass/fail checklist as a diagnostic.
-    /** @type {LH.Audit.Details.DebugData} */
-    const details = {
-      type: 'debugdata',
-      // TODO: Consider not nesting detailsItem under `items`.
-      items: [detailsItem],
-    };
+    const details = {items: [detailsItem]};
 
     // If we fail, share the failures
     if (result.failures.length > 0) {
       return {
-        score: 0,
+        rawValue: false,
         explanation: `Failures: ${result.failures.join(',\n')}.`,
         details,
       };
@@ -60,8 +55,9 @@ class MultiCheckAudit extends Audit {
 
     // Otherwise, we pass
     return {
-      score: 1,
+      rawValue: true,
       details,
+      warnings: result.warnings,
     };
   }
 
@@ -70,7 +66,7 @@ class MultiCheckAudit extends Audit {
   /**
    * @param {LH.Artifacts} artifacts
    * @param {LH.Audit.Context} context
-   * @return {Promise<{failures: Array<string>, manifestValues?: LH.Artifacts.ManifestValues}>}
+   * @return {Promise<{failures: Array<string>, warnings?: Array<string>, manifestValues?: LH.Artifacts.ManifestValues}>}
    */
   static audit_(artifacts, context) {
     throw new Error('audit_ unimplemented');

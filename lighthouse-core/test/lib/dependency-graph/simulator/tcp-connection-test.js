@@ -5,7 +5,8 @@
  */
 'use strict';
 
-const TcpConnection = require('../../../../lib/dependency-graph/simulator/tcp-connection.js');
+// eslint-disable-next-line
+const TcpConnection = require('../../../../lib/dependency-graph/simulator/tcp-connection');
 
 const assert = require('assert');
 

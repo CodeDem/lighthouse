@@ -10,8 +10,8 @@ const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
 
-const run = require('../../run.js');
-const parseChromeFlags = require('../../run.js').parseChromeFlags;
+const run = require('../../run');
+const parseChromeFlags = require('../../run').parseChromeFlags;
 const fastConfig = {
   'extends': 'lighthouse:default',
   'settings': {
@@ -19,74 +19,32 @@ const fastConfig = {
   },
 };
 
-// Map plugin name to fixture since not actually installed in node_modules/.
-jest.mock('lighthouse-plugin-simple', () => {
-  // eslint-disable-next-line max-len
-  return require('../../../lighthouse-core/test/fixtures/config-plugins/lighthouse-plugin-simple/plugin-simple.js');
-}, {virtual: true});
-
-const getFlags = require('../../cli-flags.js').getFlags;
+const getFlags = require('../../cli-flags').getFlags;
 
 describe('CLI run', function() {
-  describe('LH round trip', () => {
-    /** @type {LH.RunnerResult} */
-    let passedResults;
+  it('runLighthouse completes a LH round trip', () => {
+    const url = 'chrome://version';
     const filename = path.join(process.cwd(), 'run.ts.results.json');
-    /** @type {LH.Result} */
-    let fileResults;
-
-    beforeAll(async () => {
-      const url = 'chrome://version';
-      const timeoutFlag = `--max-wait-for-load=${9000}`;
-      const pluginsFlag = '--plugins=lighthouse-plugin-simple';
-
-      // eslint-disable-next-line max-len
-      const flags = getFlags(`--output=json --output-path=${filename} ${pluginsFlag} ${timeoutFlag} ${url}`);
-
-      const rawResult = await run.runLighthouse(url, flags, fastConfig);
-
-      if (!rawResult) {
-        return assert.fail('no results');
-      }
-      passedResults = rawResult;
-
-      assert.ok(fs.existsSync(filename));
-      fileResults = JSON.parse(fs.readFileSync(filename, 'utf-8'));
-    }, 20 * 1000);
-
-    afterAll(() => {
-      fs.unlinkSync(filename);
-    });
-
-    it('returns results that match the saved results', () => {
+    const timeoutFlag = `--max-wait-for-load=${9000}`;
+    const flags = getFlags(`--output=json --output-path=${filename} ${timeoutFlag} ${url}`);
+    return run.runLighthouse(url, flags, fastConfig).then(passedResults => {
       const {lhr} = passedResults;
-      assert.equal(fileResults.audits.viewport.score, 0);
+      assert.ok(fs.existsSync(filename));
+      const results = JSON.parse(fs.readFileSync(filename, 'utf-8'));
+      assert.equal(results.audits.viewport.rawValue, false);
 
       // passed results match saved results
-      assert.strictEqual(fileResults.fetchTime, lhr.fetchTime);
-      assert.strictEqual(fileResults.requestedUrl, lhr.requestedUrl);
-      assert.strictEqual(fileResults.finalUrl, lhr.finalUrl);
-      assert.strictEqual(fileResults.audits.viewport.score, lhr.audits.viewport.score);
+      assert.strictEqual(results.fetchTime, lhr.fetchTime);
+      assert.strictEqual(results.url, lhr.url);
+      assert.strictEqual(results.audits.viewport.rawValue, lhr.audits.viewport.rawValue);
       assert.strictEqual(
-          Object.keys(fileResults.audits).length,
+          Object.keys(results.audits).length,
           Object.keys(lhr.audits).length);
-      assert.deepStrictEqual(fileResults.timing, lhr.timing);
-    });
+      assert.deepStrictEqual(results.timing, lhr.timing);
 
-    it('includes timing information', () => {
-      assert.ok(passedResults.lhr.timing.total !== 0);
+      fs.unlinkSync(filename);
     });
-
-    it('correctly sets the channel', () => {
-      assert.equal(passedResults.lhr.configSettings.channel, 'cli');
-    });
-
-    it('merged the plugin into the config', () => {
-      // Audits have been pruned because of onlyAudits, but groups get merged in.
-      const groupNames = Object.keys(passedResults.lhr.categoryGroups || {});
-      assert.ok(groupNames.includes('lighthouse-plugin-simple-new-group'));
-    });
-  });
+  }, 20 * 1000);
 });
 
 describe('flag coercing', () => {
@@ -98,9 +56,7 @@ describe('flag coercing', () => {
 
 describe('saveResults', () => {
   it('will quit early if we\'re in gather mode', async () => {
-    const result = await run.saveResults(
-      /** @type {LH.RunnerResult} */ ({}),
-      /** @type {LH.CliFlags} */ ({gatherMode: true}));
+    const result = await run.saveResults(undefined, {gatherMode: true});
     assert.equal(result, undefined);
   });
 });

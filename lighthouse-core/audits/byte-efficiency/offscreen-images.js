@@ -9,12 +9,12 @@
  */
 'use strict';
 
-const ByteEfficiencyAudit = require('./byte-efficiency-audit.js');
-const Sentry = require('../../lib/sentry.js');
-const URL = require('../../lib/url-shim.js');
+const ByteEfficiencyAudit = require('./byte-efficiency-audit');
+const Sentry = require('../../lib/sentry');
+const URL = require('../../lib/url-shim');
 const i18n = require('../../lib/i18n/i18n.js');
-const Interactive = require('../../computed/metrics/interactive.js');
-const TraceOfTab = require('../../computed/trace-of-tab.js');
+const Interactive = require('../../gather/computed/metrics/interactive.js');
+const TraceOfTab = require('../../gather/computed/trace-of-tab.js');
 
 const UIStrings = {
   /** Imperative title of a Lighthouse audit that tells the user to defer loading offscreen images. Offscreen images are images located outside of the visible browser viewport. As they are unseen by the user and slow down page load, they should be loaded later, closer to when the user is going to see them. This is displayed in a list of audit titles that Lighthouse generates. */
@@ -47,7 +47,7 @@ class OffscreenImages extends ByteEfficiencyAudit {
       title: str_(UIStrings.title),
       description: str_(UIStrings.description),
       scoreDisplayMode: ByteEfficiencyAudit.SCORING_MODES.NUMERIC,
-      requiredArtifacts: ['ImageElements', 'ViewportDimensions', 'devtoolsLogs', 'traces'],
+      requiredArtifacts: ['ImageUsage', 'ViewportDimensions', 'devtoolsLogs', 'traces'],
     };
   }
 
@@ -69,23 +69,21 @@ class OffscreenImages extends ByteEfficiencyAudit {
   }
 
   /**
-   * @param {LH.Artifacts.ImageElement} image
+   * @param {LH.Artifacts.SingleImageUsage} image
    * @param {{innerWidth: number, innerHeight: number}} viewportDimensions
-   * @param {Array<LH.Artifacts.NetworkRequest>} networkRecords
    * @return {null|Error|WasteResult}
    */
-  static computeWaste(image, viewportDimensions, networkRecords) {
-    const networkRecord = networkRecords.find(record => record.url === image.src);
-    if (!image.resourceSize || !networkRecord) {
+  static computeWaste(image, viewportDimensions) {
+    if (!image.networkRecord) {
       return null;
     }
 
     const url = URL.elideDataURI(image.src);
-    const totalPixels = image.displayedWidth * image.displayedHeight;
+    const totalPixels = image.clientWidth * image.clientHeight;
     const visiblePixels = this.computeVisiblePixels(image.clientRect, viewportDimensions);
     // Treat images with 0 area as if they're offscreen. See https://github.com/GoogleChrome/lighthouse/issues/1914
     const wastedRatio = totalPixels === 0 ? 1 : 1 - visiblePixels / totalPixels;
-    const totalBytes = image.resourceSize;
+    const totalBytes = image.networkRecord.resourceSize;
     const wastedBytes = Math.round(totalBytes * wastedRatio);
 
     if (!Number.isFinite(wastedRatio)) {
@@ -94,7 +92,7 @@ class OffscreenImages extends ByteEfficiencyAudit {
 
     return {
       url,
-      requestStartTime: networkRecord.startTime,
+      requestStartTime: image.networkRecord.startTime,
       totalBytes,
       wastedBytes,
       wastedPercent: 100 * wastedRatio,
@@ -170,7 +168,7 @@ class OffscreenImages extends ByteEfficiencyAudit {
    * @return {Promise<ByteEfficiencyAudit.ByteEfficiencyProduct>}
    */
   static async audit_(artifacts, networkRecords, context) {
-    const images = artifacts.ImageElements;
+    const images = artifacts.ImageUsage;
     const viewportDimensions = artifacts.ViewportDimensions;
     const trace = artifacts.traces[ByteEfficiencyAudit.DEFAULT_PASS];
     const devtoolsLog = artifacts.devtoolsLogs[ByteEfficiencyAudit.DEFAULT_PASS];
@@ -178,7 +176,7 @@ class OffscreenImages extends ByteEfficiencyAudit {
     /** @type {string[]} */
     const warnings = [];
     const resultsMap = images.reduce((results, image) => {
-      const processed = OffscreenImages.computeWaste(image, viewportDimensions, networkRecords);
+      const processed = OffscreenImages.computeWaste(image, viewportDimensions);
       if (processed === null) {
         return results;
       }
@@ -223,7 +221,7 @@ class OffscreenImages extends ByteEfficiencyAudit {
         await TraceOfTab.request(trace, context).then(tot => tot.timestamps.traceEnd));
     }
 
-    /** @type {LH.Audit.Details.Opportunity['headings']} */
+    /** @type {LH.Result.Audit.OpportunityDetails['headings']} */
     const headings = [
       {key: 'url', valueType: 'thumbnail', label: ''},
       {key: 'url', valueType: 'url', label: str_(i18n.UIStrings.columnURL)},

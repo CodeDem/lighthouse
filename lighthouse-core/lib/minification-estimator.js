@@ -47,7 +47,6 @@ function computeTokenLength(content, features) {
   let isInLicenseComment = false;
   let isInString = false;
   let isInRegex = false;
-  let isInRegexCharacterClass = false;
   let stringOpenChar = null;
 
   for (let i = 0; i < content.length; i++) {
@@ -95,13 +94,7 @@ function computeTokenLength(content, features) {
         // Skip over any escaped characters
         totalTokenLength++;
         i++;
-      } else if (char === '[') {
-        // Register that we're entering a character class so we don't leave the regex prematurely
-        isInRegexCharacterClass = true;
-      } else if (char === ']' && isInRegexCharacterClass) {
-        // Register that we're exiting the character class
-        isInRegexCharacterClass = false;
-      } else if (char === '/' && !isInRegexCharacterClass) {
+      } else if (char === '/') {
         // End the string when we hit the regex close character
         isInRegex = false;
         // console.log(i, 'leaving regex', char)

@@ -12,52 +12,12 @@
 
 'use strict';
 
-const Audit = require('../audit.js');
-const Sentry = require('../../lib/sentry.js');
+const Audit = require('../audit');
+const Sentry = require('../../lib/sentry');
 const semver = require('semver');
 const snykDatabase = require('../../../third-party/snyk/snapshot.json');
-const i18n = require('../../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of a Lighthouse audit that provides detail on Javascript libraries the page uses. This descriptive title is shown to users when all Javascript libraries are free of known security vulnerabilities. */
-  title: 'Avoids front-end JavaScript libraries' +
-    ' with known security vulnerabilities',
-  /** Title of a Lighthouse audit that provides detail on Javascript libraries the page uses. This descriptive title is shown to users when some detected Javascript libraries have known security vulnerabilities. */
-  failureTitle: 'Includes front-end JavaScript libraries' +
-    ' with known security vulnerabilities',
-  /** Description of a Lighthouse audit that tells the user why they should be concerned about the third party Javascript libraries that they use. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'Some third-party scripts may contain known security vulnerabilities ' +
-    'that are easily identified and exploited by attackers. ' +
-    '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/vulnerabilities).',
-  /** [ICU Syntax] Label for the audit identifying the number of vulnerable Javascript libraries found. */
-  displayValue: `{itemCount, plural,
-    =1 {1 vulnerability detected}
-    other {# vulnerabilities detected}
-    }`,
-  /** Label for a column in a data table; entries will be the version numbers of the Javascript libraries found.  */
-  columnVersion: 'Library Version',
-  /** Label for a column in a data table; entries will be the counts of JavaScript-library vulnerabilities found.  */
-  columnVuln: 'Vulnerability Count',
-  /** Label for a column in a data table; entries will be the severity of the vulnerabilities found within a Javascript library. */
-  columnSeverity: 'Highest Severity',
-  /** Table row value for the severity of a small, or low impact Javascript vulnerability.  Part of a ranking scale in the form: low, medium, high. */
-  rowSeverityLow: 'Low',
-  /** Table row value for the severity of a Javascript vulnerability.  Part of a ranking scale in the form: low, medium, high. */
-  rowSeverityMedium: 'Medium',
-  /** Table row value for the severity of a high impact, or dangerous Javascript vulnerability.  Part of a ranking scale in the form: low, medium, high. */
-  rowSeverityHigh: 'High',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
 
 const SEMVER_REGEX = /^(\d+\.\d+\.\d+)[^-0-9]+/;
-
-/** @type {Object<string, string>} */
-const rowMap = {
-  'low': str_(UIStrings.rowSeverityLow),
-  'medium': str_(UIStrings.rowSeverityMedium),
-  'high': str_(UIStrings.rowSeverityHigh),
-};
 
 /** @typedef {{npm: Object<string, Array<{id: string, severity: string, semver: {vulnerable: Array<string>}}>>}} SnykDB */
 /** @typedef {{severity: string, numericSeverity: number, library: string, url: string}} Vulnerability */
@@ -69,10 +29,14 @@ class NoVulnerableLibrariesAudit extends Audit {
   static get meta() {
     return {
       id: 'no-vulnerable-libraries',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
-      requiredArtifacts: ['Stacks'],
+      title: 'Avoids front-end JavaScript libraries'
+        + ' with known security vulnerabilities',
+      failureTitle: 'Includes front-end JavaScript libraries'
+        + ' with known security vulnerabilities',
+      description: 'Some third-party scripts may contain known security vulnerabilities ' +
+        'that are easily identified and exploited by attackers. ' +
+        '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/vulnerabilities).',
+      requiredArtifacts: ['JSLibraries'],
     };
   }
 
@@ -96,8 +60,8 @@ class NoVulnerableLibrariesAudit extends Audit {
 
   /**
    * Attempts to normalize the version.
-   * @param {string|undefined} version
-   * @return {string|undefined}
+   * @param {?string} version
+   * @return {?string}
    */
   static normalizeVersion(version) {
     if (!version) return version;
@@ -114,44 +78,36 @@ class NoVulnerableLibrariesAudit extends Audit {
 
   /**
    * @param {string} normalizedVersion
-   * @param {LH.Artifacts.DetectedStack} lib
-   * @param {SnykDB} snykDB
+   * @param {{name: string, version: string, npmPkgName: string|undefined}} lib
    * @return {Array<Vulnerability>}
    */
-  static getVulnerabilities(normalizedVersion, lib, snykDB) {
-    if (!lib.npm || !snykDB.npm[lib.npm]) {
+  static getVulnerabilities(normalizedVersion, lib) {
+    const snykDB = NoVulnerableLibrariesAudit.snykDB;
+    if (!lib.npmPkgName || !snykDB.npm[lib.npmPkgName]) {
       return [];
     }
 
-    // Verify the version is well-formed first
     try {
       semver.satisfies(normalizedVersion, '*');
     } catch (err) {
-      err.pkgName = lib.npm;
+      err.pkgName = lib.npmPkgName;
       // Report the failure and skip this library if the version was ill-specified
       Sentry.captureException(err, {level: 'warning'});
       return [];
     }
 
-    // Match the vulnerability candidates from snyk against the version we see in the page
-    const vulnCandidatesForLib = snykDB.npm[lib.npm];
-    const matchingVulns = vulnCandidatesForLib.filter(vulnCandidate => {
-      // Each snyk vulnerability comes with an array of semver ranges
-      // The page is vulnerable if any of the ranges match.
-      const hasMatchingVersion = vulnCandidate.semver.vulnerable.some(vulnSemverRange =>
-        semver.satisfies(normalizedVersion, vulnSemverRange)
-      );
-      return hasMatchingVersion;
-    });
-
-    const vulns = matchingVulns.map(vuln => {
-      return {
-        severity: rowMap[vuln.severity],
-        numericSeverity: this.severityMap[vuln.severity],
-        library: `${lib.name}@${normalizedVersion}`,
-        url: 'https://snyk.io/vuln/' + vuln.id,
-      };
-    });
+    const snykInfo = snykDB.npm[lib.npmPkgName];
+    const vulns = snykInfo
+      .filter(vuln => semver.satisfies(normalizedVersion, vuln.semver.vulnerable[0]))
+      // valid vulnerability
+      .map(vuln => {
+        return {
+          severity: vuln.severity,
+          numericSeverity: this.severityMap[vuln.severity],
+          library: `${lib.name}@${normalizedVersion}`,
+          url: 'https://snyk.io/vuln/' + vuln.id,
+        };
+      });
 
     return vulns;
   }
@@ -171,35 +127,33 @@ class NoVulnerableLibrariesAudit extends Audit {
    * @return {LH.Audit.Product}
    */
   static audit(artifacts) {
-    const foundLibraries = artifacts.Stacks.filter(stack => stack.detector === 'js');
-    const snykDB = NoVulnerableLibrariesAudit.snykDB;
-
+    const foundLibraries = artifacts.JSLibraries;
     if (!foundLibraries.length) {
       return {
-        score: 1,
+        rawValue: true,
       };
     }
 
     let totalVulns = 0;
-    /** @type {Array<{highestSeverity: string, vulnCount: number, detectedLib: LH.Audit.Details.LinkValue}>} */
+    /** @type {Array<{highestSeverity: string, vulnCount: number, detectedLib: LH.Audit.DetailsRendererLinkDetailsJSON}>} */
     const vulnerabilityResults = [];
 
     const libraryVulns = foundLibraries.map(lib => {
       const version = this.normalizeVersion(lib.version) || '';
-      const vulns = this.getVulnerabilities(version, lib, snykDB);
+      const vulns = this.getVulnerabilities(version, lib);
       const vulnCount = vulns.length;
       totalVulns += vulnCount;
 
       let highestSeverity;
       if (vulns.length > 0) {
-        highestSeverity = this.highestSeverity(vulns);
+        highestSeverity = this.highestSeverity(vulns).replace(/^\w/, l => l.toUpperCase());
 
         vulnerabilityResults.push({
           highestSeverity,
           vulnCount,
           detectedLib: {
             text: lib.name + '@' + version,
-            url: `https://snyk.io/vuln/npm:${lib.npm}?lh=${version}&utm_source=lighthouse&utm_medium=ref&utm_campaign=audit`,
+            url: `https://snyk.io/vuln/npm:${lib.npmPkgName}?lh=${version}&utm_source=lighthouse&utm_medium=ref&utm_campaign=audit`,
             type: 'link',
           },
         });
@@ -207,7 +161,7 @@ class NoVulnerableLibrariesAudit extends Audit {
 
       return {
         name: lib.name,
-        npmPkgName: lib.npm,
+        npmPkgName: lib.npmPkgName,
         version,
         vulns,
         highestSeverity,
@@ -215,20 +169,21 @@ class NoVulnerableLibrariesAudit extends Audit {
     });
 
     let displayValue = '';
-    if (totalVulns > 0) {
-      displayValue = str_(UIStrings.displayValue, {itemCount: totalVulns});
+    if (totalVulns > 1) {
+      displayValue = `${totalVulns} vulnerabilities detected`;
+    } else if (totalVulns === 1) {
+      displayValue = `${totalVulns} vulnerability detected`;
     }
 
-    /** @type {LH.Audit.Details.Table['headings']} */
     const headings = [
-      {key: 'detectedLib', itemType: 'link', text: str_(UIStrings.columnVersion)},
-      {key: 'vulnCount', itemType: 'text', text: str_(UIStrings.columnVuln)},
-      {key: 'highestSeverity', itemType: 'text', text: str_(UIStrings.columnSeverity)},
+      {key: 'detectedLib', itemType: 'link', text: 'Library Version'},
+      {key: 'vulnCount', itemType: 'text', text: 'Vulnerability Count'},
+      {key: 'highestSeverity', itemType: 'text', text: 'Highest Severity'},
     ];
     const details = Audit.makeTableDetails(headings, vulnerabilityResults, {});
 
     return {
-      score: Number(totalVulns === 0),
+      rawValue: totalVulns === 0,
       displayValue,
       extendedInfo: {
         jsLibs: libraryVulns,
@@ -240,4 +195,3 @@ class NoVulnerableLibrariesAudit extends Audit {
 }
 
 module.exports = NoVulnerableLibrariesAudit;
-module.exports.UIStrings = UIStrings;

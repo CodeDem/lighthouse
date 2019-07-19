@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const Gatherer = require('./gatherer.js');
+const Gatherer = require('./gatherer');
 
 /**
  * @fileoverview Tracks unused CSS rules.

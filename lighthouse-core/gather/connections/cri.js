@@ -9,7 +9,6 @@ const Connection = require('./connection.js');
 const WebSocket = require('ws');
 const http = require('http');
 const log = require('lighthouse-logger');
-const LighthouseError = require('../../lib/lh-error.js');
 
 const DEFAULT_HOSTNAME = 'localhost';
 const CONNECT_TIMEOUT = 10000;
@@ -81,6 +80,7 @@ class CriConnection extends Connection {
    * @private
    */
   _runJsonCommand(command) {
+    // TODO(bckenny): can base type on command once conditional types land in TS
     return new Promise((resolve, reject) => {
       const request = http.get({
         hostname: this.hostname,
@@ -108,17 +108,22 @@ class CriConnection extends Connection {
         });
       });
 
-      // This error handler is critical to ensuring Lighthouse exits cleanly even when Chrome crashes.
-      // See https://github.com/GoogleChrome/lighthouse/pull/8583.
-      request.on('error', reject);
-
       request.setTimeout(CONNECT_TIMEOUT, () => {
-        // Reject on error with code specifically indicating timeout in connection setup.
-        const err = new LighthouseError(LighthouseError.errors.CRI_TIMEOUT);
-        log.error('CriConnection', err.friendlyMessage);
-        reject(err);
-
         request.abort();
+
+        // After aborting, we expect an ECONNRESET error. Ignore.
+        request.on('error', err => {
+          if (err.code !== 'ECONNRESET') {
+            throw err;
+          }
+        });
+
+        // TODO: Replace this with an LHError on next major version bump
+        // Reject on error with code specifically indicating timeout in connection setup.
+        const err = new Error('Timeout waiting for initial Debugger Protocol connection.');
+        err.code = 'CRI_TIMEOUT';
+        log.error('CriConnection', err.message);
+        reject(err);
       });
     });
   }

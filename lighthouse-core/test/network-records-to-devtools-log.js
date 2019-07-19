@@ -100,7 +100,7 @@ function getResponseReceivedEvent(networkRecord, index) {
         connectionReused: networkRecord.connectionReused || false,
         connectionId: networkRecord.connectionId || 140,
         fromDiskCache: networkRecord.fromDiskCache || undefined,
-        fromServiceWorker: networkRecord.fetchedViaServiceWorker || undefined,
+        fromServiceWorker: networkRecord.fromServiceWorker || undefined,
         encodedDataLength: networkRecord.transferSize || 0,
         timing,
         protocol: networkRecord.protocol || 'http/1.1',

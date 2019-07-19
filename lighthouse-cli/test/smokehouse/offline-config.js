@@ -24,7 +24,7 @@ module.exports = {
       'user-timings',
       'critical-request-chains',
       'render-blocking-resources',
-      'installable-manifest',
+      'webapp-install-banner',
       'splash-screen',
       'themed-omnibox',
       'aria-valid-attr',

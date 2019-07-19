@@ -4,59 +4,48 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
-// This comment required for LightRider import compatibility
-
 // Canonical list of errors created by Lighthouse.
 enum LighthouseError {
+  UNPARSEABLE_ERROR_CODE = 0;
   // No error in Lighthouse; the results are reliable.
-  NO_ERROR = 0;
+  NO_ERROR = 1;
   // An uncategorized error occurred, likely a JavaScript exception.
-  UNKNOWN_ERROR = 1;
+  UNKNOWN_ERROR = 2;
   // The trace did not contain any screenshot events.
-  NO_SPEEDLINE_FRAMES = 2;
+  NO_SPEEDLINE_FRAMES = 3;
   // No visual change between the beginning and end of load.
-  SPEEDINDEX_OF_ZERO = 3;
+  SPEEDINDEX_OF_ZERO = 4;
   // The trace did not contain any screenshot events.
-  NO_SCREENSHOTS = 4;
+  NO_SCREENSHOTS = 5;
   // The computed speedindex results are non-finite.
-  INVALID_SPEEDLINE = 5;
+  INVALID_SPEEDLINE = 6;
   // The trace did not contain a TracingStartedInPage event.
-  NO_TRACING_STARTED = 6;
+  NO_TRACING_STARTED = 7;
   // The trace did not contain a navigationStart event.
-  NO_NAVSTART = 7;
+  NO_NAVSTART = 8;
   // The trace did not contain a firstContentfulPaint event.
-  NO_FCP = 8;
+  NO_FCP = 9;
   // The trace did not contain a domContentLoaded event.
-  NO_DCL = 9;
+  NO_DCL = 10;
   // No network request could be identified as the primary HTML document.
-  NO_DOCUMENT_REQUEST = 10;
+  NO_DOCUMENT_REQUEST = 11;
   // The HTML document's network request failed due to Chrome-internal reasons
   // (canceled, blocked, etc).
-  FAILED_DOCUMENT_REQUEST = 11;
+  FAILED_DOCUMENT_REQUEST = 12;
   // The HTML document's network request completed, but returned an HTTP status
   // code of 4xx or 5xx.
-  ERRORED_DOCUMENT_REQUEST = 12;
+  ERRORED_DOCUMENT_REQUEST = 13;
   // Chromium's tracing controller did not manage to begin tracing across
   // processes. Typically fixed by restarting Chromium.
-  TRACING_ALREADY_STARTED = 13;
+  TRACING_ALREADY_STARTED = 14;
   // The trace data wasn't parsed correctly.
-  PARSING_PROBLEM = 14;
+  PARSING_PROBLEM = 15;
   // The trace data failed to stream over the protocol.
-  READ_FAILED = 15;
-  // Used when security error prevents page load.
-  INSECURE_DOCUMENT_REQUEST = 16;
-  // Used when protocol command times out.
-  PROTOCOL_TIMEOUT = 17;
-  // Used when the page is not responding after maxWaitForLoad.
-  PAGE_HUNG = 18;
-  // DNS failure on main document (no resolution, timed out, etc)
-  DNS_FAILURE = 19;
-  // A timeout in the initial connection to the debugger protocol.
-  CRI_TIMEOUT = 20;
+  READ_FAILED = 16;
 }
 
 // The overarching Lighthouse Response object (LHR)
-// https://github.com/GoogleChrome/lighthouse/blob/master/types/lhr.d.ts
+// https://github.com/GoogleChrome/lighthouse/blob/master/typings/lhr.d.ts
 message LighthouseResult {
   // The timestamp of when the results were generated.
   google.protobuf.Timestamp fetch_time = 1;
@@ -76,11 +65,11 @@ message LighthouseResult {
     // The user agent that was used by the network
     string network_user_agent = 1;
 
-    // The user agent used by the host
+    // The user agent used by the host 
     string host_user_agent = 2;
 
     // The benchmark index that indicates rough device class
-    google.protobuf.DoubleValue benchmark_index = 3;
+    int32 benchmark_index = 3;
   }
 
   // The environment that the audit was run in
@@ -117,6 +106,63 @@ message LighthouseResult {
 
   // Message containing the configuration settings for the LH run
   message ConfigSettings {
+    // The output types the audit made (json, html...)
+    repeated string output = 1;
+
+    // The maximum amount of time to wait for loading in ms
+    int32 max_wait_for_load = 2;
+
+    // Network throttling options
+    enum ThrottlingMethod {
+      // Unknown method.  Should not be used
+      UNKNOWN_THROTTLING_METHOD = 0;
+
+      // Use devtools to throttle the request
+      devtools = 1;
+      
+      // Use no additional throttling (only throttling provided by system itself)
+      provided = 2;
+
+      // Simulate throttling with Lantern
+      simulate = 3;
+    }
+    
+    // The throttling method used during this audit
+    ThrottlingMethod throttling_method = 3;
+
+    // Message containing the throttling settings used in an LH configuration
+    message Throttling {
+      // The round trip time in ms
+      int32 rtt_ms = 1;
+
+      // The throughput in kilobytes per second
+      google.protobuf.DoubleValue throughput_kbps = 2;
+
+      // The request latency in milliseconds
+      google.protobuf.DoubleValue request_latency_ms = 3;
+
+      // The download throughput in kilobytes per second
+      google.protobuf.DoubleValue download_throughput_kbps = 4;
+
+      // The upload throughput in kilobytes per second
+      google.protobuf.DoubleValue upload_throughput_kbps = 5;
+
+      // The amount of slowdown to apply to the cpu
+      int32 cpu_slowdown_multiplier = 6;
+    }
+
+    // The throttling settings used
+    Throttling throttling = 4;
+
+    // Flag indicating this audit was gather only or not
+    google.protobuf.BoolValue gather_mode = 5;
+
+    // Flag disabling clearing the browser cache before runs
+    google.protobuf.BoolValue disable_storage_reset = 6;
+
+    // Flag indicating if device emulation was enabled or not
+    google.protobuf.BoolValue disable_device_emulation = 7;
+
     // The possible form factors an audit can be run in
     enum EmulatedFormFactor {
       // Unknown form factor.  This should not be used
@@ -133,17 +179,33 @@ message LighthouseResult {
     }
 
     // The form factor used in the audit
-    EmulatedFormFactor emulated_form_factor = 1;
-
+    EmulatedFormFactor emulated_form_factor = 8;
+    
     // The locale that was active during the audit
-    string locale = 2;
+    string locale = 9;
+
+    // List of URL patterns that were blocked during this audit
+    // nullable list of strings
+    google.protobuf.Value blocked_url_patterns = 10;
+
+    // Comma delimited list of trace categories to capture
+    // nullable string
+    google.protobuf.Value additional_trace_categories = 11;
+
+    // Map of extra HTTP Headers to pass in with the request
+    google.protobuf.Value extra_headers = 12;
+
+    // List of the audits that were preformed, empty if all were run
+    // nullable list of strings
+    google.protobuf.Value only_audits = 13;
 
     // List of the categories that were run, empty if all were run
     // nullable list of strings
-    google.protobuf.Value only_categories = 3;
+    google.protobuf.Value only_categories = 14;
 
-    // How Lighthouse was run, e.g. from the Chrome extension or from the npm module
-    string channel = 4;
+    // List of the audits that were skipped, empty if all were run
+    // nullable list of strings
+    google.protobuf.Value skip_audits = 15;
   }
 
   // The settings that were used to run this audit
@@ -151,36 +213,9 @@ message LighthouseResult {
 
   // i18n info in version 1 message format
   I18n i18n = 13;
-
-  // Message containing the performance timing data for the Lighthouse run
-  message Timing {
-
-    // Corresponds to: https://www.w3.org/TR/performance-timeline-2/#dom-performanceentry
-    message PerformanceEntry {
-      string name = 1;
-      string entry_type = 2;
-      google.protobuf.DoubleValue start_time = 3;
-      google.protobuf.DoubleValue duration = 4;
-
-      // Whether timing entry was collected during artifact gathering.
-      bool gather = 5;
-    }
-
-    // The total duration of Lighthouse's run
-    google.protobuf.DoubleValue total = 1;
-
-    // Corresponds to: https://www.w3.org/TR/performance-timeline-2/#idl-def-performanceentrylist
-    repeated PerformanceEntry entries = 2;
-  }
-
-  // The performance timing data for the Lighthouse run
-  Timing timing = 14;
-
-  // The Stack Pack data used by audits in this run.
-  repeated StackPack stack_packs = 15;
 }
 
-// Message containing a category
+// Message containing a category 
 message CategoryGroup {
   // The human readable title of the group
   string title = 1;
@@ -209,8 +244,7 @@ message LhrCategory {
   // An description for manual audits within this category.
   string manual_description = 5;
 
-  // A Category's reference to an AuditResult, with a weight for category
-  // scoring.
+  // A Category's reference to an AuditResult, with a weight for category scoring.
   message AuditRef {
     // Matches a key in the top-level `audits` map.
     string id = 1;
@@ -258,7 +292,6 @@ message AuditResult {
     // The audit turned out to not apply to the page. Score is NaN and should be
     // ignored.
     not_applicable = 4;
-    notApplicable = 7;
     // The audit exists only to tell you to review something yourself. Score is
     // NaN and should be ignored
     manual = 5;
@@ -279,18 +312,12 @@ message AuditResult {
   // Error message from any exception thrown while running this audit.
   string error_message = 8;
 
-  // Extra information provided by some types of audits.  Given as an arbitrary
-  // object.
+  // Extra information provided by some types of audits.  Given as an arbitrary object.
   google.protobuf.Struct details = 9;
 
   // List of warnings associated with this audit
   // type of `Value` since this can be null
   google.protobuf.Value warnings = 10;
-
-  // A numeric value that has a meaning specific to the audit, e.g. the number
-  // of nodes in the DOM or the timestamp of a specific load event. More
-  // information can be found in the audit details, if present.
-  google.protobuf.DoubleValue numeric_value = 11;
 }
 
 // Message containing the i18n data for the LHR - Version 1
@@ -324,12 +351,10 @@ message I18n {
     // The heading shown above a list of audits that do not apply to a page
     string not_applicable_audits_group_title = 9;
 
-    // The heading shown above a list of audits that were not computerd in the
-    // run
+    // The heading shown above a list of audits that were not computerd in the run
     string manual_audits_group_title = 10;
 
-    // The label shown preceding important warnings that may have invalidated an
-    // entire report
+    // The label shown preceding important warnings that may have invalidated an entire report
     string toplevel_warnings_message = 11;
 
     // The label that explains the score gauges scale (0-49, 50-89, 90-100)
@@ -341,41 +366,13 @@ message I18n {
     // The label for the initial request in a critical request chain
     string crc_initial_navigation = 14;
 
-    // The disclaimer shown under performance explaning that the network can
-    // vary
+    // The disclaimer shown under performance explaning that the network can vary
     string ls_performance_category_description = 15;
 
     // The title of the lab data performance category
     string lab_data_title = 16;
-
-    // The heading that is shown above a list of audits that have warnings
-    string warning_audits_group_title = 17;
-
-    // The label for the button to show all lines of a snippet
-    string snippet_expand_button_label = 18;
-
-    // The label for the button to show only a few lines of a snippet
-    string snippet_collapse_button_label = 19;
-
-    // This label is for a filter checkbox above a table of items
-    string third_party_resources_label = 20;
   }
 
   // The message holding all formatted strings
   RendererFormattedStrings renderer_formatted_strings = 1;
-}
-
-// Message containing Stack Pack information.
-message StackPack {
-  // The human readable id of the Stack Pack.
-  string id = 1;
-
-  // The user facing title of the Stack Pack.
-  string title = 2;
-
-  // The icon as a data url.
-  string icon_data_URL = 3;
-
-  // Map of audit-ids to Stack Pack descriptions.
-  map<string, string> descriptions = 4;
 }

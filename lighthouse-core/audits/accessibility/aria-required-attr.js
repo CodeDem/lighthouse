@@ -10,20 +10,7 @@
  * See base class in axe-audit.js for audit() implementation.
  */
 
-const AxeAudit = require('./axe-audit.js');
-const i18n = require('../../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of an accesibility audit that evaluates if all elements with the aria-role attribute have the other corresponding ARIA attributes set as well. This title is descriptive of the successful state and is shown to users when no user action is required. */
-  title: '`[role]`s have all required `[aria-*]` attributes',
-  /** Title of an accesibility audit that evaluates if all elements with the aria-role attribute have the other corresponding ARIA attributes set as well. This title is descriptive of the failing state and is shown to users when there is a failure that needs to be addressed. */
-  failureTitle: '`[role]`s do not have all required `[aria-*]` attributes',
-  /** Description of a Lighthouse audit that tells the user *why* they should try to pass. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'Some ARIA roles have required attributes that describe the state ' +
-      'of the element to screen readers. [Learn more](https://dequeuniversity.com/rules/axe/3.1/aria-required-attr?application=lighthouse).',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
+const AxeAudit = require('./axe-audit');
 
 class ARIARequiredAttr extends AxeAudit {
   /**
@@ -32,13 +19,13 @@ class ARIARequiredAttr extends AxeAudit {
   static get meta() {
     return {
       id: 'aria-required-attr',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
+      title: '`[role]`s have all required `[aria-*]` attributes',
+      failureTitle: '`[role]`s do not have all required `[aria-*]` attributes',
+      description: 'Some ARIA roles have required attributes that describe the state ' +
+          'of the element to screen readers. [Learn more](https://dequeuniversity.com/rules/axe/2.2/aria-required-attr?application=lighthouse).',
       requiredArtifacts: ['Accessibility'],
     };
   }
 }
 
 module.exports = ARIARequiredAttr;
-module.exports.UIStrings = UIStrings;

@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const URL = require('./url-shim.js');
+const URL = require('./url-shim');
 const cssParsers = require('cssstyle/lib/parsers');
 
 const ALLOWED_DISPLAY_VALUES = [
@@ -16,7 +16,7 @@ const ALLOWED_DISPLAY_VALUES = [
 ];
 /**
  * All display-mode fallbacks, including when unset, lead to default display mode 'browser'.
- * @see https://www.w3.org/TR/2016/WD-appmanifest-20160825/#dfn-default-display-mode
+ * @see https://w3c.github.io/manifest/#dfn-default-display-mode
  */
 const DEFAULT_DISPLAY_MODE = 'browser';
 
@@ -111,11 +111,10 @@ function checkSameOrigin(url1, url2) {
 }
 
 /**
- * https://www.w3.org/TR/2016/WD-appmanifest-20160825/#start_url-member
+ * https://w3c.github.io/manifest/#start_url-member
  * @param {*} jsonInput
  * @param {string} manifestUrl
  * @param {string} documentUrl
- * @return {{raw: any, value: string, warning?: string}}
  */
 function parseStartUrl(jsonInput, manifestUrl, documentUrl) {
   const raw = jsonInput.start_url;
@@ -128,18 +127,10 @@ function parseStartUrl(jsonInput, manifestUrl, documentUrl) {
       warning: 'ERROR: start_url string empty',
     };
   }
-  if (raw === undefined) {
-    return {
-      raw,
-      value: documentUrl,
-    };
-  }
-  if (typeof raw !== 'string') {
-    return {
-      raw,
-      value: documentUrl,
-      warning: 'ERROR: expected a string.',
-    };
+  const parsedAsString = parseString(raw);
+  if (!parsedAsString.value) {
+    parsedAsString.value = documentUrl;
+    return parsedAsString;
   }
 
   // 8.10(4) - construct URL with raw as input and manifestUrl as the base.
@@ -151,7 +142,7 @@ function parseStartUrl(jsonInput, manifestUrl, documentUrl) {
     return {
       raw,
       value: documentUrl,
-      warning: `ERROR: invalid start_url relative to ${manifestUrl}`,
+      warning: 'ERROR: invalid start_url relative to ${manifestUrl}',
     };
   }
 
@@ -218,7 +209,6 @@ function parseOrientation(jsonInput) {
 }
 
 /**
- * @see https://www.w3.org/TR/2016/WD-appmanifest-20160825/#src-member
  * @param {*} raw
  * @param {string} manifestUrl
  */
@@ -230,14 +220,8 @@ function parseIcon(raw, manifestUrl) {
     src.value = undefined;
   }
   if (src.value) {
-    try {
-      // 9.4(4) - construct URL with manifest URL as the base
-      src.value = new URL(src.value, manifestUrl).href;
-    } catch (_) {
-      // 9.4 "This algorithm will return a URL or undefined."
-      src.warning = `ERROR: invalid icon url will be ignored: '${raw.src}'`;
-      src.value = undefined;
-    }
+    // 9.4(4) - construct URL with manifest URL as the base
+    src.value = new URL(src.value, manifestUrl).href;
   }
 
   const type = parseString(raw.type, true);
@@ -308,31 +292,20 @@ function parseIcons(jsonInput, manifestUrl) {
     };
   }
 
-  const parsedIcons = raw
+  // TODO(bckenny): spec says to skip icons missing `src`, so debug messages on
+  // individual icons are lost. Warn instead?
+  const value = raw
     // 9.6(3)(1)
     .filter(icon => icon.src !== undefined)
     // 9.6(3)(2)(1)
-    .map(icon => parseIcon(icon, manifestUrl));
-
-  // NOTE: we still lose the specific message on these icons, but it's not possible to surface them
-  // without a massive change to the structure and paradigms of `manifest-parser`.
-  const ignoredIconsWithWarnings = parsedIcons
-    .filter(icon => {
-      const possibleWarnings = [icon.warning, icon.value.type.warning, icon.value.src.warning,
-        icon.value.sizes.warning, icon.value.density.warning].filter(Boolean);
-      const hasSrc = !!icon.value.src.value;
-      return !!possibleWarnings.length && !hasSrc;
-    });
-
-  const value = parsedIcons
+    .map(icon => parseIcon(icon, manifestUrl))
     // 9.6(3)(2)(2)
     .filter(parsedIcon => parsedIcon.value.src.value !== undefined);
 
   return {
     raw,
     value,
-    warning: ignoredIconsWithWarnings.length ?
-      'WARNING: Some icons were ignored due to warnings.' : undefined,
+    warning: undefined,
   };
 }
 
@@ -351,7 +324,7 @@ function parseApplication(raw) {
       appUrl.value = new URL(appUrl.value).href;
     } catch (e) {
       appUrl.value = undefined;
-      appUrl.warning = `ERROR: invalid application URL ${raw.url}`;
+      appUrl.warning = 'ERROR: invalid application URL ${raw.url}';
     }
   }
 
@@ -478,21 +451,10 @@ function parse(string, manifestUrl, documentUrl) {
   };
   /* eslint-enable camelcase */
 
-  /** @type {string|undefined} */
-  let manifestUrlWarning;
-  try {
-    const manifestUrlParsed = new URL(manifestUrl);
-    if (!manifestUrlParsed.protocol.startsWith('http')) {
-      manifestUrlWarning = `WARNING: manifest URL not available over a valid network protocol`;
-    }
-  } catch (_) {
-    manifestUrlWarning = `ERROR: invalid manifest URL: '${manifestUrl}'`;
-  }
-
   return {
     raw: string,
     value: manifest,
-    warning: manifestUrlWarning,
+    warning: undefined,
   };
 }
 

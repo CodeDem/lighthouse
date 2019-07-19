@@ -5,29 +5,7 @@
  */
 'use strict';
 
-const Audit = require('../audit.js');
-const i18n = require('../../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of a Lighthouse audit that provides detail on the doctype of a page. This descriptive title is shown to users when the pages's doctype is set to HTML. */
-  title: 'Page has the HTML doctype',
-  /** Title of a Lighthouse audit that provides detail on the doctype of a page. This descriptive title is shown to users when the page's doctype is not set to HTML. */
-  failureTitle: 'Page lacks the HTML doctype, thus triggering quirks-mode',
-  /** Description of a Lighthouse audit that tells the user why they should define an HTML doctype. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'Specifying a doctype prevents the browser ' +
-    'from switching to quirks-mode. Read more on the ' +
-    '[MDN Web Docs page](https://developer.mozilla.org/en-US/docs/Glossary/Doctype)',
-  /** Explanatory message stating that the document has no doctype. */
-  explanationNoDoctype: 'Document must contain a doctype',
-  /** Explanatory message stating that the publicId field is not empty. */
-  explanationPublicId: 'Expected publicId to be an empty string',
-  /** Explanatory message stating that the systemId field is not empty. */
-  explanationSystemId: 'Expected systemId to be an empty string',
-  /** Explanatory message stating that the doctype is set, but is not "html" and is therefore invalid. */
-  explanationBadDoctype: 'Doctype name must be the lowercase string `html`',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
+const Audit = require('../audit');
 
 class Doctype extends Audit {
   /**
@@ -36,9 +14,11 @@ class Doctype extends Audit {
   static get meta() {
     return {
       id: 'doctype',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
+      title: 'Page has the HTML doctype',
+      failureTitle: 'Page is missing the HTML doctype',
+      description: 'Specifying a doctype prevents the browser from switching to quirks-mode.' +
+                'Read more on the ' +
+                '[MDN Web Docs page](https://developer.mozilla.org/en-US/docs/Glossary/Doctype)',
       requiredArtifacts: ['Doctype'],
     };
   }
@@ -50,8 +30,8 @@ class Doctype extends Audit {
   static audit(artifacts) {
     if (!artifacts.Doctype) {
       return {
-        score: 0,
-        explanation: str_(UIStrings.explanationNoDoctype),
+        rawValue: false,
+        explanation: 'Document must contain a doctype',
       };
     }
 
@@ -62,15 +42,15 @@ class Doctype extends Audit {
 
     if (doctypePublicId !== '') {
       return {
-        score: 0,
-        explanation: str_(UIStrings.explanationPublicId),
+        rawValue: false,
+        explanation: 'Expected publicId to be an empty string',
       };
     }
 
     if (doctypeSystemId !== '') {
       return {
-        score: 0,
-        explanation: str_(UIStrings.explanationSystemId),
+        rawValue: false,
+        explanation: 'Expected systemId to be an empty string',
       };
     }
 
@@ -79,16 +59,15 @@ class Doctype extends Audit {
        https://html.spec.whatwg.org/multipage/parsing.html#the-initial-insertion-mode */
     if (doctypeName === 'html') {
       return {
-        score: 1,
+        rawValue: true,
       };
     } else {
       return {
-        score: 0,
-        explanation: str_(UIStrings.explanationBadDoctype),
+        rawValue: false,
+        explanation: 'Doctype name must be the lowercase string `html`',
       };
     }
   }
 }
 
 module.exports = Doctype;
-module.exports.UIStrings = UIStrings;

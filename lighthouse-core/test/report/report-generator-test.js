@@ -53,17 +53,16 @@ describe('ReportGenerator', () => {
     });
 
     it('should inject the report templates', () => {
-      const page = new jsdom.JSDOM(ReportGenerator.generateReportHtml({}));
-      const templates = new jsdom.JSDOM(TEMPLATES_FILE);
-      assert.equal(page.window.document.querySelectorAll('template[id^="tmpl-"]').length,
-        templates.window.document.querySelectorAll('template[id^="tmpl-"]').length,
-        'all templates injected');
+      const page = jsdom.jsdom(ReportGenerator.generateReportHtml({}));
+      const templates = jsdom.jsdom(TEMPLATES_FILE);
+      assert.equal(page.querySelectorAll('template[id^="tmpl-"]').length,
+          templates.querySelectorAll('template[id^="tmpl-"]').length, 'all templates injected');
     });
 
     it('should inject the report CSS', () => {
       const result = ReportGenerator.generateReportHtml({});
       assert.ok(!result.includes('/*%%LIGHTHOUSE_CSS%%*/'));
-      assert.ok(result.includes('--color-green'));
+      assert.ok(result.includes('--pass-color'));
     });
 
     it('should inject the report renderer javascript', () => {

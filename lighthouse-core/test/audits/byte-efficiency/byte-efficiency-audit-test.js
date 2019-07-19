@@ -5,12 +5,12 @@
  */
 'use strict';
 
-const ByteEfficiencyAudit_ = require('../../../audits/byte-efficiency/byte-efficiency-audit.js');
-const NetworkNode = require('../../../lib/dependency-graph/network-node.js');
-const CPUNode = require('../../../lib/dependency-graph/cpu-node.js');
-const Simulator = require('../../../lib/dependency-graph/simulator/simulator.js');
-const PageDependencyGraph = require('../../../computed/page-dependency-graph.js');
-const LoadSimulator = require('../../../computed/load-simulator.js');
+const ByteEfficiencyAudit_ = require('../../../audits/byte-efficiency/byte-efficiency-audit');
+const NetworkNode = require('../../../lib/dependency-graph/network-node');
+const CPUNode = require('../../../lib/dependency-graph/cpu-node');
+const Simulator = require('../../../lib/dependency-graph/simulator/simulator');
+const PageDependencyGraph = require('../../../gather/computed/page-dependency-graph.js');
+const LoadSimulator = require('../../../gather/computed/load-simulator.js');
 
 
 const trace = require('../../fixtures/traces/progressive-app-m60.json');
@@ -53,11 +53,9 @@ describe('Byte efficiency base audit', () => {
   describe('#estimateTransferSize', () => {
     const estimate = ByteEfficiencyAudit.estimateTransferSize;
 
-    it('should estimate by resource type compression ratio when no network info available', () => {
-      assert.equal(estimate(undefined, 1000, 'Stylesheet'), 200);
-      assert.equal(estimate(undefined, 1000, 'Script'), 330);
-      assert.equal(estimate(undefined, 1000, 'Document'), 330);
-      assert.equal(estimate(undefined, 1000, ''), 500);
+    it('should estimate by compression ratio when no network record available', () => {
+      const result = estimate(undefined, 1000, '', 0.345);
+      assert.equal(result, 345);
     });
 
     it('should return transferSize when asset matches', () => {
@@ -88,7 +86,7 @@ describe('Byte efficiency base audit', () => {
     assert.deepEqual(result.details.items, []);
   });
 
-  it('should set the numericValue', () => {
+  it('should set the rawValue', () => {
     const result = ByteEfficiencyAudit.createAuditProduct(
       {
         headings: baseHeadings,
@@ -101,7 +99,7 @@ describe('Byte efficiency base audit', () => {
     );
 
     // 900ms savings comes from the graph calculation
-    assert.equal(result.numericValue, 900);
+    assert.equal(result.rawValue, 900);
   });
 
   it('should score the wastedMs', () => {
@@ -200,7 +198,7 @@ describe('Byte efficiency base audit', () => {
       simulator
     );
 
-    assert.equal(result.numericValue, 300);
+    assert.equal(result.rawValue, 300);
   });
 
   it('should create load simulator with the specified settings', async () => {
@@ -224,14 +222,14 @@ describe('Byte efficiency base audit', () => {
     let settings = {throttlingMethod: 'simulate', throttling: modestThrottling};
     let result = await MockAudit.audit(artifacts, {settings, computedCache});
     // expect modest savings
-    expect(result.numericValue).toBeLessThan(5000);
-    expect(result.numericValue).toMatchSnapshot();
+    expect(result.rawValue).toBeLessThan(5000);
+    expect(result.rawValue).toMatchSnapshot();
 
     settings = {throttlingMethod: 'simulate', throttling: ultraSlowThrottling};
     result = await MockAudit.audit(artifacts, {settings, computedCache});
     // expect lots of savings
-    expect(result.numericValue).not.toBeLessThan(5000);
-    expect(result.numericValue).toMatchSnapshot();
+    expect(result.rawValue).not.toBeLessThan(5000);
+    expect(result.rawValue).toMatchSnapshot();
   });
 
   it('should allow overriding of computeWasteWithTTIGraph', async () => {
@@ -262,7 +260,7 @@ describe('Byte efficiency base audit', () => {
     const result = await MockAudit.audit(artifacts, {settings, computedCache});
     const resultTti = await MockJustTTIAudit.audit(artifacts, {settings, computedCache});
     // expect less savings with just TTI
-    expect(resultTti.numericValue).toBeLessThan(result.numericValue);
-    expect({default: result.numericValue, justTTI: resultTti.numericValue}).toMatchSnapshot();
+    expect(resultTti.rawValue).toBeLessThan(result.rawValue);
+    expect({default: result.rawValue, justTTI: resultTti.rawValue}).toMatchSnapshot();
   });
 });

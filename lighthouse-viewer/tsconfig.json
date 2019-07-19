@@ -2,14 +2,14 @@
   "extends": "../tsconfig",
   "compilerOptions": {
     "typeRoots": [
-      "../node_modules/@types",
-      "../types",
+      "@types",
+      "../typings",
       "./types",
     ],
   },
   "include": [
     "app/src/**/*.js",
-    "../types/*.d.ts",
+    "../typings/*.d.ts",
     "./types/*.d.ts",
   ],
 }

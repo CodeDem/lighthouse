@@ -5,32 +5,10 @@
  */
 'use strict';
 
-const Audit = require('./audit.js');
-const URL = require('../lib/url-shim.js');
-const NetworkRecords = require('../computed/network-records.js');
-const i18n = require('../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of a Lighthouse audit that provides detail on the useage of HTTPS on a page. This descriptive title is shown to users when all requests on a page are fufilled using HTTPS. */
-  title: 'Uses HTTPS',
-  /** Title of a Lighthouse audit that provides detail on the useage of HTTPS on a page. This descriptive title is shown to users when some, or all, requests on the page use HTTP instead of HTTPS. */
-  failureTitle: 'Does not use HTTPS',
-  /** Description of a Lighthouse audit that tells the user *why* HTTPS use is important. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'All sites should be protected with HTTPS, even ones that don\'t handle ' +
-      'sensitive data. HTTPS prevents intruders from tampering with or passively listening ' +
-      'in on the communications between your app and your users, and is a prerequisite for ' +
-      'HTTP/2 and many new web platform APIs. ' +
-      '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/https).',
-  /** [ICU Syntax] Label identifying the number of insecure network requests found by an audit of a web page. */
-  displayValue: `{itemCount, plural,
-    =1 {1 insecure request found}
-    other {# insecure requests found}
-    }`,
-  /** Label for a column in a data table; entries in the column will be the URLs of insecure (non-HTTPS) network requests. */
-  columnInsecureURL: 'Insecure URL',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
+const Audit = require('./audit');
+const URL = require('../lib/url-shim');
+const Util = require('../report/html/renderer/util');
+const NetworkRecords = require('../gather/computed/network-records.js');
 
 const SECURE_SCHEMES = ['data', 'https', 'wss', 'blob', 'chrome', 'chrome-extension', 'about'];
 const SECURE_DOMAINS = ['localhost', '127.0.0.1'];
@@ -42,9 +20,13 @@ class HTTPS extends Audit {
   static get meta() {
     return {
       id: 'is-on-https',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
+      title: 'Uses HTTPS',
+      failureTitle: 'Does not use HTTPS',
+      description: 'All sites should be protected with HTTPS, even ones that don\'t handle ' +
+          'sensitive data. HTTPS prevents intruders from tampering with or passively listening ' +
+          'in on the communications between your app and your users, and is a prerequisite for ' +
+          'HTTP/2 and many new web platform APIs. ' +
+          '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/https).',
       requiredArtifacts: ['devtoolsLogs'],
     };
   }
@@ -71,20 +53,21 @@ class HTTPS extends Audit {
           .filter(record => !HTTPS.isSecureRecord(record))
           .map(record => URL.elideDataURI(record.url));
 
-      const items = Array.from(new Set(insecureURLs)).map(url => ({url}));
-
       let displayValue = '';
-      if (items.length > 0) {
-        displayValue = str_(UIStrings.displayValue, {itemCount: items.length});
+      if (insecureURLs.length > 1) {
+        displayValue = `${Util.formatNumber(insecureURLs.length)} insecure requests found`;
+      } else if (insecureURLs.length === 1) {
+        displayValue = `${insecureURLs.length} insecure request found`;
       }
 
-      /** @type {LH.Audit.Details.Table['headings']} */
+      const items = Array.from(new Set(insecureURLs)).map(url => ({url}));
+
       const headings = [
-        {key: 'url', itemType: 'url', text: str_(UIStrings.columnInsecureURL)},
+        {key: 'url', itemType: 'url', text: 'Insecure URL'},
       ];
 
       return {
-        score: Number(items.length === 0),
+        rawValue: items.length === 0,
         displayValue,
         extendedInfo: {
           value: items,
@@ -96,4 +79,3 @@ class HTTPS extends Audit {
 }
 
 module.exports = HTTPS;
-module.exports.UIStrings = UIStrings;

@@ -10,8 +10,6 @@ const mainTemplate = readFileSync(resolve(__dirname, 'templates/template.hbs')).
 const headerPartial = readFileSync(resolve(__dirname, 'templates/header.hbs')).toString();
 const commitPartial = readFileSync(resolve(__dirname, 'templates/commit.hbs')).toString();
 
-/** @typedef {{type: string, header: string, hash?: string, message?: string, PR?: string}} Commit */
-
 const pullRequestRegex = /\(#(\d+)\)$/;
 const parserOpts = {
   headerPattern: /^(\w*)(?:\((.*)\))?: (.*)$/,
@@ -32,7 +30,6 @@ const writerOpts = {
   mainTemplate,
   headerPartial,
   commitPartial,
-  /** @param {Commit} commit */
   transform: commit => {
     if (typeof commit.hash === 'string') {
       commit.hash = commit.hash.substring(0, 7);
@@ -71,7 +68,6 @@ const writerOpts = {
     return commit;
   },
   groupBy: 'type',
-  /** @param {{title: string}} a @param {{title: string}} b */
   commitGroupsSort: (a, b) => {
     // put new audit on the top
     if (a.title === 'New Audits') {

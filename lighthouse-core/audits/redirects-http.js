@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const Audit = require('./audit.js');
+const Audit = require('./audit');
 
 class RedirectsHTTP extends Audit {
   /**
@@ -28,7 +28,7 @@ class RedirectsHTTP extends Audit {
    */
   static audit(artifacts) {
     return {
-      score: Number(artifacts.HTTPRedirect.value),
+      rawValue: artifacts.HTTPRedirect.value,
     };
   }
 }

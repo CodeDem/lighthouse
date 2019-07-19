@@ -15,8 +15,8 @@ describe('DOBETTERWEB: doctype audit', () => {
     const auditResult = Audit.audit({
       Doctype: null,
     });
-    assert.equal(auditResult.score, 0);
-    expect(auditResult.explanation).toBeDisplayString('Document must contain a doctype');
+    assert.equal(auditResult.rawValue, false);
+    assert.equal(auditResult.explanation, 'Document must contain a doctype');
   });
 
   it('fails when the value of the name attribute is a value other then lowercase "html"', () => {
@@ -27,9 +27,8 @@ describe('DOBETTERWEB: doctype audit', () => {
         systemId: '',
       },
     });
-    assert.equal(auditResult.score, 0);
-    expect(auditResult.explanation).toBeDisplayString(
-      'Doctype name must be the lowercase string `html`');
+    assert.equal(auditResult.rawValue, false);
+    assert.equal(auditResult.explanation, 'Doctype name must be the lowercase string `html`');
   });
 
   it('fails when the value of the name attribute is not the lowercase string "html"', () => {
@@ -40,9 +39,8 @@ describe('DOBETTERWEB: doctype audit', () => {
         systemId: '',
       },
     });
-    assert.equal(auditResult.score, 0);
-    expect(auditResult.explanation).toBeDisplayString(
-      'Doctype name must be the lowercase string `html`');
+    assert.equal(auditResult.rawValue, false);
+    assert.equal(auditResult.explanation, 'Doctype name must be the lowercase string `html`');
   });
 
   it('fails when the publicId attribute is not an empty string', () => {
@@ -53,8 +51,8 @@ describe('DOBETTERWEB: doctype audit', () => {
         systemId: '',
       },
     });
-    assert.equal(auditResult.score, 0);
-    expect(auditResult.explanation).toBeDisplayString('Expected publicId to be an empty string');
+    assert.equal(auditResult.rawValue, false);
+    assert.equal(auditResult.explanation, 'Expected publicId to be an empty string');
   });
 
   it('fails when the systemId attribute is not an empty string', () => {
@@ -65,8 +63,8 @@ describe('DOBETTERWEB: doctype audit', () => {
         systemId: '189655',
       },
     });
-    assert.equal(auditResult.score, 0);
-    expect(auditResult.explanation).toBeDisplayString('Expected systemId to be an empty string');
+    assert.equal(auditResult.rawValue, false);
+    assert.equal(auditResult.explanation, 'Expected systemId to be an empty string');
   });
 
   it('succeeds when document contains a doctype, and the name value is "html"', () => {
@@ -77,6 +75,6 @@ describe('DOBETTERWEB: doctype audit', () => {
         systemId: '',
       },
     });
-    assert.equal(auditResult.score, 1);
+    assert.equal(auditResult.rawValue, true);
   });
 });

@@ -19,7 +19,7 @@ describe('Offline: works-offline audit', () => {
       URL: {requestedUrl: URL, finalUrl: URL},
     });
 
-    assert.equal(output.score, 1);
+    assert.equal(output.rawValue, true);
     assert.ok(!output.explanation);
   });
 
@@ -29,7 +29,7 @@ describe('Offline: works-offline audit', () => {
       URL: {requestedUrl: URL, finalUrl: `${URL}/features`},
     });
 
-    assert.equal(output.score, 0);
+    assert.equal(output.rawValue, false);
     assert.ok(output.warnings[0]);
   });
 
@@ -39,7 +39,7 @@ describe('Offline: works-offline audit', () => {
       URL: {requestedUrl: URL, finalUrl: URL},
     });
 
-    assert.equal(output.score, 0);
+    assert.equal(output.rawValue, false);
     assert.ok(!output.explanation);
   });
 });

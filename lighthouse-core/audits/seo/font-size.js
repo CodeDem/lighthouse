@@ -7,32 +7,10 @@
 
 /** @typedef {LH.Artifacts.FontSize['analyzedFailingNodesData'][0]} FailingNodeData */
 
-const URL = require('../../lib/url-shim.js');
-const i18n = require('../../lib/i18n/i18n.js');
-const Audit = require('../audit.js');
-const ComputedViewportMeta = require('../../computed/viewport-meta.js');
+const URL = require('../../lib/url-shim');
+const Audit = require('../audit');
+const ViewportAudit = require('../viewport');
 const MINIMAL_PERCENTAGE_OF_LEGIBLE_TEXT = 60;
-
-const UIStrings = {
-  /** Title of a Lighthouse audit that provides detail on the font sizes used on the page. This descriptive title is shown to users when the fonts used on the page are large enough to be considered legible. */
-  title: 'Document uses legible font sizes',
-  /** Title of a Lighthouse audit that provides detail on the font sizes used on the page. This descriptive title is shown to users when there is a font that may be too small to be read by users. */
-  failureTitle: 'Document doesn\'t use legible font sizes',
-  /** Description of a Lighthouse audit that tells the user *why* they need to use a larger font size. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'Font sizes less than 12px are too small to be legible and require mobile visitors to “pinch to zoom” in order to read. Strive to have >60% of page text ≥12px. [Learn more](https://developers.google.com/web/tools/lighthouse/audits/font-sizes).',
-  /** Label for the audit identifying font sizes that are too small. */
-  displayValue: '{decimalProportion, number, extendedPercent} legible text',
-  /** Explanatory message stating that there was a failure in an audit caused by a missing page viewport meta tag configuration. "viewport" and "meta" are HTML terms and should not be translated. */
-  explanationViewport: 'Text is illegible because there\'s no viewport meta tag optimized ' +
-    'for mobile screens.',
-  /** Explanatory message stating that there was a failure in an audit caused by a certain percentage of the text on the page being too small. "decimalProportion" will be replaced by a percentage between 0 and 100%. */
-  explanation: '{decimalProportion, number, extendedPercent} of text is too small.',
-  /** Explanatory message stating that there was a failure in an audit caused by a certain percentage of the text on the page being too small, based on a sample size of text that was less than 100% of the text on the page. "decimalProportion" will be replaced by a percentage between 0 and 100%. */
-  explanationWithDisclaimer: '{decimalProportion, number, extendedPercent} of text is too ' +
-    'small (based on {decimalProportionVisited, number, extendedPercent} sample).',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
 
 /**
  * @param {Array<FailingNodeData>} fontSizeArtifact
@@ -156,27 +134,13 @@ function findStyleRuleSource(baseURL, styleDeclaration, node) {
         const range = styleDeclaration.range;
         source = `${url.href}`;
 
-        // !!range == has defined location in a source file (.css or .html)
         if (range) {
-          let line = range.startLine + 1;
-          let column = range.startColumn;
+          // `stylesheet` can be either an external file (stylesheet.startLine will always be 0),
+          // or a <style> block (stylesheet.startLine will vary)
+          const absoluteStartLine = range.startLine + stylesheet.startLine + 1;
+          const absoluteStartColumn = range.startColumn + stylesheet.startColumn + 1;
 
-          // Add the startLine/startColumn of the <style> element to the range, if stylesheet
-          // is inline.
-          // Always use the rule's location if a sourceURL magic comment is
-          // present (`hasSourceURL` is true) - this makes the line/col relative to the start
-          // of the style tag, which makes them relevant when the "file" is open in DevTool's
-          // Sources panel.
-          const addHtmlLocationOffset = stylesheet.isInline && !stylesheet.hasSourceURL;
-          if (addHtmlLocationOffset) {
-            line += stylesheet.startLine;
-            // The column the stylesheet begins on is only relevant if the rule is declared on the same line.
-            if (range.startLine === 0) {
-              column += stylesheet.startColumn;
-            }
-          }
-
-          source += `:${line}:${column}`;
+          source += `:${absoluteStartLine}:${absoluteStartColumn}`;
         }
       } else {
         // dynamically injected to page
@@ -190,8 +154,6 @@ function findStyleRuleSource(baseURL, styleDeclaration, node) {
     }
   }
 
-  // The responsible style declaration was not captured in the font-size gatherer due to
-  // the rate limiting we do in `fetchFailingNodeSourceRules`.
   return {
     selector: '',
     source: 'Unknown',
@@ -220,32 +182,25 @@ class FontSize extends Audit {
   static get meta() {
     return {
       id: 'font-size',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
-      requiredArtifacts: ['FontSize', 'URL', 'MetaElements', 'TestedAsMobileDevice'],
+      title: 'Document uses legible font sizes',
+      failureTitle: 'Document doesn\'t use legible font sizes',
+      description: 'Font sizes less than 12px are too small to be legible and require mobile ' +
+      'visitors to “pinch to zoom” in order to read. Strive to have >60% of page text ≥12px. ' +
+      '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/font-sizes).',
+      requiredArtifacts: ['FontSize', 'URL', 'Viewport'],
     };
   }
 
   /**
    * @param {LH.Artifacts} artifacts
-   * @param {LH.Audit.Context} context
-   * @return {Promise<LH.Audit.Product>}
+   * @return {LH.Audit.Product}
    */
-  static async audit(artifacts, context) {
-    if (!artifacts.TestedAsMobileDevice) {
-      // Font size isn't important to desktop SEO
+  static audit(artifacts) {
+    const hasViewportSet = ViewportAudit.audit(artifacts).rawValue;
+    if (!hasViewportSet) {
       return {
-        score: 1,
-        notApplicable: true,
-      };
-    }
-
-    const viewportMeta = await ComputedViewportMeta.request(artifacts.MetaElements, context);
-    if (!viewportMeta.isMobileOptimized) {
-      return {
-        score: 0,
-        explanation: str_(UIStrings.explanationViewport),
+        rawValue: false,
+        explanation: 'Text is illegible because of a missing viewport config',
       };
     }
 
@@ -259,7 +214,7 @@ class FontSize extends Audit {
 
     if (totalTextLength === 0) {
       return {
-        score: 1,
+        rawValue: true,
       };
     }
 
@@ -268,7 +223,6 @@ class FontSize extends Audit {
       (visitedTextLength - failingTextLength) / visitedTextLength * 100;
     const pageUrl = artifacts.URL.finalUrl;
 
-    /** @type {LH.Audit.Details.Table['headings']} */
     const headings = [
       {key: 'source', itemType: 'url', text: 'Source'},
       {key: 'selector', itemType: 'code', text: 'Selector'},
@@ -311,31 +265,27 @@ class FontSize extends Audit {
       });
     }
 
-    const decimalProportion = (percentageOfPassingText / 100);
-    const displayValue = str_(UIStrings.displayValue, {decimalProportion});
+    /** @type {LH.Audit.DisplayValue} */
+    const displayValue = ['%.1d% legible text', percentageOfPassingText];
     const details = Audit.makeTableDetails(headings, tableData);
     const passed = percentageOfPassingText >= MINIMAL_PERCENTAGE_OF_LEGIBLE_TEXT;
 
     let explanation;
     if (!passed) {
-      const percentageOfFailingText = (100 - percentageOfPassingText) / 100;
+      const percentageOfFailingText = parseFloat((100 - percentageOfPassingText).toFixed(2));
+      let disclaimer = '';
 
       // if we were unable to visit all text nodes we should disclose that information
       if (visitedTextLength < totalTextLength) {
-        const percentageOfVisitedText = (visitedTextLength / totalTextLength);
-        explanation = str_(UIStrings.explanationWithDisclaimer,
-          {
-            decimalProportion: percentageOfFailingText,
-            decimalProportionVisited: percentageOfVisitedText,
-          });
-      } else {
-        explanation = str_(UIStrings.explanation,
-          {decimalProportion: percentageOfFailingText});
+        const percentageOfVisitedText = visitedTextLength / totalTextLength * 100;
+        disclaimer = ` (based on ${percentageOfVisitedText.toFixed()}% sample)`;
       }
+
+      explanation = `${percentageOfFailingText}% of text is too small${disclaimer}.`;
     }
 
     return {
-      score: Number(passed),
+      rawValue: passed,
       details,
       displayValue,
       explanation,
@@ -344,4 +294,3 @@ class FontSize extends Audit {
 }
 
 module.exports = FontSize;
-module.exports.UIStrings = UIStrings;

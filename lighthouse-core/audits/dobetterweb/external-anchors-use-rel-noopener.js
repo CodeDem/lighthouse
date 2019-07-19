@@ -5,29 +5,8 @@
  */
 'use strict';
 
-const URL = require('../../lib/url-shim.js');
-const Audit = require('../audit.js');
-const i18n = require('../../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of a Lighthouse audit that provides detail on the cross-origin links that the web page contains, and whether the links can be considered safe. This descriptive title is shown to users when all links are safe. */
-  title: 'Links to cross-origin destinations are safe',
-  /** Title of a Lighthouse audit that provides detail on the cross-origin links that the web page contains, and whether the links can be considered safe. This descriptive title is shown to users when not all links can be considered safe. */
-  failureTitle: 'Links to cross-origin destinations are unsafe',
-  /** Description of a Lighthouse audit that tells the user why and how they should secure cross-origin links. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'Add `rel="noopener"` or `rel="noreferrer"` to any external links to improve ' +
-    'performance and prevent security vulnerabilities. ' +
-    '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/noopener).',
-  /** Warning that some links' destinations cannot be determined and therefore the audit cannot evaluate the link's safety. */
-  warning: 'Unable to determine the destination for anchor ({anchorHTML}). ' +
-    'If not used as a hyperlink, consider removing target=_blank.',
-  /** Label for a column in a data table; entries will be the target attribute of a link. Each entry is either an empty string or a string like `_blank`.  */
-  columnTarget: 'Target',
-  /** Label for a column in a data table; entries will be the values of the html "rel" attribute from link in a page.  */
-  columnRel: 'Rel',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
+const URL = require('../../lib/url-shim');
+const Audit = require('../audit');
 
 class ExternalAnchorsUseRelNoopenerAudit extends Audit {
   /**
@@ -36,10 +15,12 @@ class ExternalAnchorsUseRelNoopenerAudit extends Audit {
   static get meta() {
     return {
       id: 'external-anchors-use-rel-noopener',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
-      requiredArtifacts: ['URL', 'AnchorElements'],
+      title: 'Links to cross-origin destinations are safe',
+      failureTitle: 'Links to cross-origin destinations are unsafe',
+      description: 'Add `rel="noopener"` or `rel="noreferrer"` to any external links to improve ' +
+          'performance and prevent security vulnerabilities. ' +
+          '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/noopener).',
+      requiredArtifacts: ['URL', 'AnchorsWithNoRelNoopener'],
     };
   }
 
@@ -51,15 +32,14 @@ class ExternalAnchorsUseRelNoopenerAudit extends Audit {
     /** @type {string[]} */
     const warnings = [];
     const pageHost = new URL(artifacts.URL.finalUrl).host;
-    const failingAnchors = artifacts.AnchorElements
-      .filter(anchor => anchor.target === '_blank' && !anchor.rel.includes('noopener') &&
-        !anchor.rel.includes('noreferrer'))
     // Filter usages to exclude anchors that are same origin
+    const failingAnchors = artifacts.AnchorsWithNoRelNoopener
       .filter(anchor => {
         try {
           return new URL(anchor.href).host !== pageHost;
         } catch (err) {
-          warnings.push(str_(UIStrings.warning, {anchorHTML: anchor.outerHTML}));
+          warnings.push(`Unable to determine the destination for anchor (${anchor.outerHTML}). ` +
+            'If not used as a hyperlink, consider removing target=_blank.');
           return true;
         }
       })
@@ -75,17 +55,16 @@ class ExternalAnchorsUseRelNoopenerAudit extends Audit {
         };
       });
 
-    /** @type {LH.Audit.Details.Table['headings']} */
     const headings = [
-      {key: 'href', itemType: 'url', text: str_(i18n.UIStrings.columnURL)},
-      {key: 'target', itemType: 'text', text: str_(UIStrings.columnTarget)},
-      {key: 'rel', itemType: 'text', text: str_(UIStrings.columnRel)},
+      {key: 'href', itemType: 'url', text: 'URL'},
+      {key: 'target', itemType: 'text', text: 'Target'},
+      {key: 'rel', itemType: 'text', text: 'Rel'},
     ];
 
     const details = Audit.makeTableDetails(headings, failingAnchors);
 
     return {
-      score: Number(failingAnchors.length === 0),
+      rawValue: failingAnchors.length === 0,
       extendedInfo: {
         value: failingAnchors,
       },
@@ -96,4 +75,3 @@ class ExternalAnchorsUseRelNoopenerAudit extends Audit {
 }
 
 module.exports = ExternalAnchorsUseRelNoopenerAudit;
-module.exports.UIStrings = UIStrings;

@@ -6,14 +6,12 @@
 assets/
 build/
 coverage/
-dist/
-proto/
 
 lighthouse-core/scripts/*
 lighthouse-core/test/
 lighthouse-core/third_party/src/
 lighthouse-viewer/
-clients/
+lighthouse-extension/
 lighthouse-cli/results/
 lighthouse-logger/
 
@@ -28,6 +26,7 @@ node_modules/
 results/
 lantern-data/
 latest-run/
+plots/
 
 # generated files
 **/pages/scripts/lighthouse-report.js
@@ -41,7 +40,6 @@ latest.artifacts.log
 npm-debug.log
 yarn-error.log
 results.html
-*.lcov
 
 # dev files
 .appveyor.yml

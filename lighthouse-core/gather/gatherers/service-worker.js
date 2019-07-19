@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const Gatherer = require('./gatherer.js');
+const Gatherer = require('./gatherer');
 
 class ServiceWorker extends Gatherer {
   /**
@@ -14,11 +14,8 @@ class ServiceWorker extends Gatherer {
    */
   async beforePass(passContext) {
     const {versions} = await passContext.driver.getServiceWorkerVersions();
-    const {registrations} = await passContext.driver.getServiceWorkerRegistrations();
-
     return {
       versions,
-      registrations,
     };
   }
 }

@@ -11,29 +11,10 @@
 
 'use strict';
 
-const URL = require('../../lib/url-shim.js');
-const Audit = require('../audit.js');
-const NetworkRecords = require('../../computed/network-records.js');
-const i18n = require('../../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of a Lighthouse audit that provides detail on whether the webpage uses HTTP/2 for resources it requests over the network. This descriptive title is shown to users when the page uses HTTP/2 for its requests. */
-  title: 'Uses HTTP/2 for its own resources',
-  /** Title of a Lighthouse audit that provides detail on whether the webpage uses HTTP/2 for resources it requests over the network. This descriptive title is shown to users when the page does not use HTTP/2 for its requests. */
-  failureTitle: 'Does not use HTTP/2 for all of its resources',
-  /** Description of a Lighthouse audit that tells the user why they should use HTTP/2. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'HTTP/2 offers many benefits over HTTP/1.1, including binary headers, ' +
-      'multiplexing, and server push. [Learn more](https://developers.google.com/web/tools/lighthouse/audits/http2).',
-  /** [ICU Syntax] Label identifying the number of network requests that were not served with HTTP/2. */
-  displayValue: `{itemCount, plural,
-    =1 {1 request not served via HTTP/2}
-    other {# requests not served via HTTP/2}
-    }`,
-  /**  Label for a column in a data table; entries in the column will be the HTTP Protocol used to make a network request. */
-  columnProtocol: 'Protocol',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
+const URL = require('../../lib/url-shim');
+const Audit = require('../audit');
+const Util = require('../../report/html/renderer/util.js');
+const NetworkRecords = require('../../gather/computed/network-records.js');
 
 class UsesHTTP2Audit extends Audit {
   /**
@@ -42,9 +23,10 @@ class UsesHTTP2Audit extends Audit {
   static get meta() {
     return {
       id: 'uses-http2',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
+      title: 'Uses HTTP/2 for its own resources',
+      failureTitle: 'Does not use HTTP/2 for all of its resources',
+      description: 'HTTP/2 offers many benefits over HTTP/1.1, including binary headers, ' +
+          'multiplexing, and server push. [Learn more](https://developers.google.com/web/tools/lighthouse/audits/http2).',
       requiredArtifacts: ['URL', 'devtoolsLogs'],
     };
   }
@@ -62,9 +44,6 @@ class UsesHTTP2Audit extends Audit {
       const seenURLs = new Set();
       // Filter requests that are on the same host as the page and not over h2.
       const resources = networkRecords.filter(record => {
-        // check if record is not served through the service worker, servicer worker uses http/1.1 as a protocol
-        // these can generate false positives (bug: https://github.com/GoogleChrome/lighthouse/issues/7158)
-        if (record.fetchedViaServiceWorker) return false;
         // test the protocol first to avoid (potentially) expensive URL parsing
         const isOldHttp = /HTTP\/[01][.\d]?/i.test(record.protocol);
         if (!isOldHttp) return false;
@@ -82,19 +61,21 @@ class UsesHTTP2Audit extends Audit {
       });
 
       let displayValue = '';
-      if (resources.length > 0) {
-        displayValue = str_(UIStrings.displayValue, {itemCount: resources.length});
+      if (resources.length > 1) {
+        displayValue =
+          `${Util.formatNumber(resources.length)} requests not served via HTTP/2`;
+      } else if (resources.length === 1) {
+        displayValue = `${resources.length} request not served via HTTP/2`;
       }
 
-      /** @type {LH.Audit.Details.Table['headings']} */
       const headings = [
-        {key: 'url', itemType: 'url', text: str_(i18n.UIStrings.columnURL)},
-        {key: 'protocol', itemType: 'text', text: str_(UIStrings.columnProtocol)},
+        {key: 'url', itemType: 'url', text: 'URL'},
+        {key: 'protocol', itemType: 'text', text: 'Protocol'},
       ];
       const details = Audit.makeTableDetails(headings, resources);
 
       return {
-        score: Number(resources.length === 0),
+        rawValue: resources.length === 0,
         displayValue: displayValue,
         extendedInfo: {
           value: {
@@ -108,4 +89,3 @@ class UsesHTTP2Audit extends Audit {
 }
 
 module.exports = UsesHTTP2Audit;
-module.exports.UIStrings = UIStrings;

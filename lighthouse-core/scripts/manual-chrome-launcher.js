@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 'use strict';
+
 /**
  * @fileoverview Script to launch a clean Chrome instance on-demand.
  *
@@ -13,35 +14,29 @@
  *     chrome-debug --enable-extensions
  */
 
-const {Launcher, launch} = require('chrome-launcher');
+const {launch} = require('chrome-launcher');
 
 const args = process.argv.slice(2);
-const chromeFlags = [];
+let chromeFlags;
 let startingUrl;
 let port;
-let ignoreDefaultFlags;
+let enableExtensions;
 
 if (args.length) {
-  const providedFlags = args.filter(flag => flag.startsWith('--'));
+  chromeFlags = args.filter(flag => flag.startsWith('--'));
 
-  const portFlag = providedFlags.find(flag => flag.startsWith('--port='));
+  const portFlag = chromeFlags.find(flag => flag.startsWith('--port='));
   if (portFlag) port = parseInt(portFlag.replace('--port=', ''), 10);
 
-  const enableExtensions = !!providedFlags.find(flag => flag === '--enable-extensions');
-  // The basic pattern for enabling Chrome extensions
-  if (enableExtensions) {
-    ignoreDefaultFlags = true;
-    chromeFlags.push(...Launcher.defaultFlags().filter(flag => flag !== '--disable-extensions'));
-  }
+  enableExtensions = !!chromeFlags.find(flag => flag === '--enable-extensions');
 
-  chromeFlags.push(...providedFlags);
   startingUrl = args.find(flag => !flag.startsWith('--'));
 }
 
 launch({
   startingUrl,
   port,
-  ignoreDefaultFlags,
+  enableExtensions,
   chromeFlags,
 })
 // eslint-disable-next-line no-console

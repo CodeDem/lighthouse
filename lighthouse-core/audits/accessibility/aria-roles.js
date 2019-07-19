@@ -10,21 +10,7 @@
  * See base class in axe-audit.js for audit() implementation.
  */
 
-const AxeAudit = require('./axe-audit.js');
-const i18n = require('../../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of an accesibility audit that evaluates if all elements have valid aria-role HTML attributes. This title is descriptive of the successful state and is shown to users when no user action is required. */
-  title: '`[role]` values are valid',
-  /** Title of an accesibility audit that evaluates if all elements have valid aria-role HTML attributes. This title is descriptive of the failing state and is shown to users when there is a failure that needs to be addressed. */
-  failureTitle: '`[role]` values are not valid',
-  /** Description of a Lighthouse audit that tells the user *why* they should try to pass. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'ARIA roles must have valid values in order to perform their ' +
-      'intended accessibility functions. ' +
-      '[Learn more](https://dequeuniversity.com/rules/axe/3.1/aria-roles?application=lighthouse).',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
+const AxeAudit = require('./axe-audit');
 
 class AriaRoles extends AxeAudit {
   /**
@@ -33,13 +19,14 @@ class AriaRoles extends AxeAudit {
   static get meta() {
     return {
       id: 'aria-roles',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
+      title: '`[role]` values are valid',
+      failureTitle: '`[role]` values are not valid',
+      description: 'ARIA roles must have valid values in order to perform their ' +
+          'intended accessibility functions. ' +
+          '[Learn more](https://dequeuniversity.com/rules/axe/2.2/aria-roles?application=lighthouse).',
       requiredArtifacts: ['Accessibility'],
     };
   }
 }
 
 module.exports = AriaRoles;
-module.exports.UIStrings = UIStrings;

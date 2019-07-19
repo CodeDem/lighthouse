@@ -2,14 +2,13 @@
 
 exports[`Performance: metrics evaluates valid input correctly 1`] = `
 Object {
-  "cumulativeLongQueuingDelay": 748,
-  "estimatedInputLatency": 78,
+  "estimatedInputLatency": 104,
   "estimatedInputLatencyTs": undefined,
   "firstCPUIdle": 3351,
   "firstCPUIdleTs": undefined,
-  "firstContentfulPaint": 1307,
+  "firstContentfulPaint": 911,
   "firstContentfulPaintTs": undefined,
-  "firstMeaningfulPaint": 1511,
+  "firstMeaningfulPaint": 1355,
   "firstMeaningfulPaintTs": undefined,
   "interactive": 3427,
   "interactiveTs": undefined,
@@ -33,7 +32,7 @@ Object {
   "observedSpeedIndexTs": 225414776724,
   "observedTraceEnd": 12540,
   "observedTraceEndTs": 225426711887,
-  "speedIndex": 1657,
+  "speedIndex": 1656,
   "speedIndexTs": undefined,
 }
 `;

@@ -16,89 +16,62 @@ const URL = 'https://google.com/test';
 describe('External anchors use rel="noopener"', () => {
   it('passes when links are from same hosts as the page host', () => {
     const auditResult = ExternalAnchorsAudit.audit({
-      AnchorElements: [
-        {href: 'https://google.com/test', target: '_blank', rel: ''},
-        {href: 'https://google.com/test1', target: '_blank', rel: ''},
+      AnchorsWithNoRelNoopener: [
+        {href: 'https://google.com/test'},
+        {href: 'https://google.com/test1'},
       ],
       URL: {finalUrl: URL},
     });
-    assert.equal(auditResult.score, 1);
-    assert.equal(auditResult.details.items.length, 0);
-    assert.equal(auditResult.details.items.length, 0);
-  });
-
-  it('passes when links have a valid rel', () => {
-    const auditResult = ExternalAnchorsAudit.audit({
-      AnchorElements: [
-        {href: 'https://other.com/test', target: '_blank', rel: 'nofollow noopener'},
-        {href: 'https://other.com/test1', target: '_blank', rel: 'noreferrer'},
-        {href: 'https://other.com/test2', target: '_blank', rel: 'noopener'},
-      ],
-      URL: {finalUrl: URL},
-    });
-    assert.equal(auditResult.score, 1);
-    assert.equal(auditResult.details.items.length, 0);
-    assert.equal(auditResult.details.items.length, 0);
-  });
-
-  it('passes when links do not use target=_blank', () => {
-    const auditResult = ExternalAnchorsAudit.audit({
-      AnchorElements: [
-        {href: 'https://other.com/test', rel: ''},
-        {href: 'https://other.com/test1', rel: ''},
-      ],
-      URL: {finalUrl: URL},
-    });
-    assert.equal(auditResult.score, 1);
+    assert.equal(auditResult.rawValue, true);
     assert.equal(auditResult.details.items.length, 0);
     assert.equal(auditResult.details.items.length, 0);
   });
 
   it('passes when links have javascript in href attribute', () => {
     const auditResult = ExternalAnchorsAudit.audit({
-      AnchorElements: [
-        {href: 'javascript:void(0)', target: '_blank', rel: ''},
-        {href: 'JAVASCRIPT:void(0)', target: '_blank', rel: ''},
+      AnchorsWithNoRelNoopener: [
+        {href: 'javascript:void(0)'},
+        {href: 'JAVASCRIPT:void(0)'},
       ],
       URL: {finalUrl: URL},
     });
-    assert.equal(auditResult.score, 1);
+    assert.equal(auditResult.rawValue, true);
     assert.equal(auditResult.details.items.length, 0);
   });
 
   it('passes when links have mailto in href attribute', () => {
     const auditResult = ExternalAnchorsAudit.audit({
-      AnchorElements: [
-        {href: 'mailto:inbox@email.com', target: '_blank', rel: ''},
-        {href: 'MAILTO:INBOX@EMAIL.COM', target: '_blank', rel: ''},
+      AnchorsWithNoRelNoopener: [
+        {href: 'mailto:inbox@email.com'},
+        {href: 'MAILTO:INBOX@EMAIL.COM'},
       ],
       URL: {finalUrl: URL},
     });
-    assert.equal(auditResult.score, 1);
+    assert.equal(auditResult.rawValue, true);
     assert.equal(auditResult.details.items.length, 0);
   });
 
   it('fails when links are from different hosts than the page host', () => {
     const auditResult = ExternalAnchorsAudit.audit({
-      AnchorElements: [
-        {href: 'https://example.com/test', target: '_blank', rel: 'nofollow'},
-        {href: 'https://example.com/test1', target: '_blank', rel: ''},
+      AnchorsWithNoRelNoopener: [
+        {href: 'https://example.com/test'},
+        {href: 'https://example.com/test1'},
       ],
       URL: {finalUrl: URL},
     });
-    assert.equal(auditResult.score, 0);
+    assert.equal(auditResult.rawValue, false);
     assert.equal(auditResult.details.items.length, 2);
     assert.equal(auditResult.details.items.length, 2);
   });
 
   it('fails when links have no href attribute', () => {
     const auditResult = ExternalAnchorsAudit.audit({
-      AnchorElements: [
-        {href: '', target: '_blank', rel: ''},
+      AnchorsWithNoRelNoopener: [
+        {href: ''},
       ],
       URL: {finalUrl: URL},
     });
-    assert.equal(auditResult.score, 0);
+    assert.equal(auditResult.rawValue, false);
     assert.equal(auditResult.details.items.length, 1);
     assert.equal(auditResult.details.items.length, 1);
     assert.ok(auditResult.warnings.length, 'includes warning');
@@ -106,15 +79,15 @@ describe('External anchors use rel="noopener"', () => {
 
   it('fails when links have href attribute starting with a protocol', () => {
     const auditResult = ExternalAnchorsAudit.audit({
-      AnchorElements: [
-        {href: 'http://', target: '_blank', rel: ''},
-        {href: 'http:', target: '_blank', rel: ''},
-        {href: 'https://', target: '_blank', rel: ''},
-        {href: 'https:', target: '_blank', rel: ''},
+      AnchorsWithNoRelNoopener: [
+        {href: 'http://'},
+        {href: 'http:'},
+        {href: 'https://'},
+        {href: 'https:'},
       ],
       URL: {finalUrl: URL},
     });
-    assert.equal(auditResult.score, 0);
+    assert.equal(auditResult.rawValue, false);
     assert.equal(auditResult.details.items.length, 4);
     assert.equal(auditResult.details.items.length, 4);
     assert.equal(auditResult.warnings.length, 4);

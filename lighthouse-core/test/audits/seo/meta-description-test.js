@@ -11,34 +11,32 @@ const assert = require('assert');
 /* eslint-env jest */
 
 describe('SEO: description audit', () => {
-  const makeMetaElements = content => [{name: 'description', content}];
-
   it('fails when HTML does not contain a description meta tag', () => {
     const auditResult = Audit.audit({
-      MetaElements: [],
+      MetaDescription: null,
     });
-    assert.equal(auditResult.score, 0);
+    assert.equal(auditResult.rawValue, false);
   });
 
   it('fails when HTML contains an empty description meta tag', () => {
     const auditResult = Audit.audit({
-      MetaElements: makeMetaElements(''),
+      MetaDescription: '',
     });
-    assert.equal(auditResult.score, 0);
-    expect(auditResult.explanation).toBeDisplayString('Description text is empty.');
+    assert.equal(auditResult.rawValue, false);
+    assert.ok(auditResult.explanation.includes('empty'), auditResult.explanation);
   });
 
   it('fails when description consists only of whitespace', () => {
     const auditResult = Audit.audit({
-      MetaElements: makeMetaElements('\t\xa0'),
+      MetaDescription: '\t\xa0',
     });
-    assert.equal(auditResult.score, 0);
-    expect(auditResult.explanation).toBeDisplayString('Description text is empty.');
+    assert.equal(auditResult.rawValue, false);
+    assert.ok(auditResult.explanation.includes('empty'), auditResult.explanation);
   });
 
   it('passes when a description text is provided', () => {
     return assert.equal(Audit.audit({
-      MetaElements: makeMetaElements('description text'),
-    }).score, 1);
+      MetaDescription: 'description text',
+    }).rawValue, true);
   });
 });

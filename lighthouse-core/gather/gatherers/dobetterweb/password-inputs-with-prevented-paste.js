@@ -7,8 +7,8 @@
 
 /* global document ClipboardEvent getOuterHTMLSnippet */
 
-const Gatherer = require('../gatherer.js');
-const pageFunctions = require('../../../lib/page-functions.js');
+const Gatherer = require('../gatherer');
+const pageFunctions = require('../../../lib/page-functions');
 
 // This is run in the page, not Lighthouse itself.
 /**

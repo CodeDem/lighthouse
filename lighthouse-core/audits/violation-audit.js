@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const Audit = require('./audit.js');
+const Audit = require('./audit');
 
 class ViolationAudit extends Audit {
   /**
@@ -15,7 +15,7 @@ class ViolationAudit extends Audit {
    */
   static getViolationResults(artifacts, pattern) {
     const seen = new Set();
-    return artifacts.ConsoleMessages
+    return artifacts.ChromeConsoleMessages
         .map(message => message.entry)
         .filter(entry => entry.url && entry.source === 'violation' && pattern.test(entry.text))
         .map(entry => ({label: `line: ${entry.lineNumber}`, url: entry.url}))

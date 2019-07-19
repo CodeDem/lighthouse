@@ -9,7 +9,7 @@
 
 /* eslint-disable no-console */
 
-const ultradumbBenchmark = require('../lib/page-functions.js').ultradumbBenchmark;
+const ultradumbBenchmark = require('../lib/page-functions').ultradumbBenchmark;
 
 console.log('Running ULTRADUMB™ benchmark 10 times...');
 

@@ -36,7 +36,7 @@ class LoadAudit extends Audit {
     const belowThreshold = loadMetrics.searchableTime <= MAX_SEARCHABLE_TIME;
 
     return {
-      numericValue: loadMetrics.searchableTime,
+      rawValue: loadMetrics.searchableTime,
       // Cast true/false to 1/0
       score: Number(belowThreshold),
     };

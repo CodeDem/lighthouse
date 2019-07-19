@@ -5,12 +5,12 @@
  */
 'use strict';
 
-const Audit = require('./audit.js');
-const NetworkRequest = require('../lib/network-request.js');
-const {taskGroups} = require('../lib/tracehouse/task-groups.js');
+const Audit = require('./audit');
+const NetworkRequest = require('../lib/network-request');
+const {taskGroups} = require('../lib/task-groups');
 const i18n = require('../lib/i18n/i18n.js');
-const NetworkRecords = require('../computed/network-records.js');
-const MainThreadTasks = require('../computed/main-thread-tasks.js');
+const NetworkRecords = require('../gather/computed/network-records.js');
+const MainThreadTasks = require('../gather/computed/main-thread-tasks.js');
 
 const UIStrings = {
   /** Title of a diagnostic audit that provides detail on the time spent executing javascript files during the load. This descriptive title is shown to users when the amount is acceptable and no user action is required. */
@@ -22,7 +22,7 @@ const UIStrings = {
     'You may find delivering smaller JS payloads helps with this. [Learn ' +
     'more](https://developers.google.com/web/tools/lighthouse/audits/bootup).',
   /** Label for the total time column in a data table; entries will be the number of milliseconds spent executing per resource loaded by the page. */
-  columnTotal: 'Total CPU Time',
+  columnTotal: 'Total',
   /** Label for a time column in a data table; entries will be the number of milliseconds spent evaluating script for every script loaded by the page. */
   columnScriptEval: 'Script Evaluation',
   /** Label for a time column in a data table; entries will be the number of milliseconds spent parsing script files for every script loaded by the page. */
@@ -45,7 +45,7 @@ class BootupTime extends Audit {
       failureTitle: str_(UIStrings.failureTitle),
       description: str_(UIStrings.description),
       scoreDisplayMode: Audit.SCORING_MODES.NUMERIC,
-      requiredArtifacts: ['traces', 'devtoolsLogs'],
+      requiredArtifacts: ['traces'],
     };
   }
 
@@ -78,20 +78,6 @@ class BootupTime extends Audit {
   }
 
   /**
-   * @param {LH.Artifacts.TaskNode} task
-   * @param {Set<string>} jsURLs
-   * @return {string}
-   */
-  static getAttributableURLForTask(task, jsURLs) {
-    const jsURL = task.attributableURLs.find(url => jsURLs.has(url));
-    const fallbackURL = task.attributableURLs[0];
-    let attributableURL = jsURL || fallbackURL;
-    // If we can't find what URL was responsible for this execution, just attribute it to the root page.
-    if (!attributableURL || attributableURL === 'about:blank') attributableURL = 'Other';
-    return attributableURL;
-  }
-
-  /**
    * @param {LH.Artifacts.TaskNode[]} tasks
    * @param {Set<string>} jsURLs
    * @return {Map<string, Object<string, number>>}
@@ -101,7 +87,11 @@ class BootupTime extends Audit {
     const result = new Map();
 
     for (const task of tasks) {
-      const attributableURL = BootupTime.getAttributableURLForTask(task, jsURLs);
+      const jsURL = task.attributableURLs.find(url => jsURLs.has(url));
+      const fallbackURL = task.attributableURLs[0];
+      const attributableURL = jsURL || fallbackURL;
+      if (!attributableURL || attributableURL === 'about:blank') continue;
+
       const timingByGroupId = result.get(attributableURL) || {};
       const originalTime = timingByGroupId[task.group.id] || 0;
       timingByGroupId[task.group.id] = originalTime + task.selfTime;
@@ -132,27 +122,27 @@ class BootupTime extends Audit {
     let totalBootupTime = 0;
     const results = Array.from(executionTimings)
       .map(([url, timingByGroupId]) => {
-        // Add up the totalExecutionTime for all the taskGroups
-        let totalExecutionTimeForURL = 0;
+        // Add up the totalBootupTime for all the taskGroups
+        let bootupTimeForURL = 0;
         for (const [groupId, timespanMs] of Object.entries(timingByGroupId)) {
           timingByGroupId[groupId] = timespanMs * multiplier;
-          totalExecutionTimeForURL += timespanMs * multiplier;
+          bootupTimeForURL += timespanMs * multiplier;
+        }
+
+        // Add up all the execution time of shown URLs
+        if (bootupTimeForURL >= context.options.thresholdInMs) {
+          totalBootupTime += bootupTimeForURL;
         }
 
         const scriptingTotal = timingByGroupId[taskGroups.scriptEvaluation.id] || 0;
         const parseCompileTotal = timingByGroupId[taskGroups.scriptParseCompile.id] || 0;
-
-        // Add up all the JavaScript time of shown URLs
-        if (totalExecutionTimeForURL >= context.options.thresholdInMs) {
-          totalBootupTime += scriptingTotal + parseCompileTotal;
-        }
 
         hadExcessiveChromeExtension = hadExcessiveChromeExtension ||
           (url.startsWith('chrome-extension:') && scriptingTotal > 100);
 
         return {
           url: url,
-          total: totalExecutionTimeForURL,
+          total: bootupTimeForURL,
           // Highlight the JavaScript task costs
           scripting: scriptingTotal,
           scriptParseCompile: parseCompileTotal,
@@ -169,7 +159,6 @@ class BootupTime extends Audit {
 
     const summary = {wastedMs: totalBootupTime};
 
-    /** @type {LH.Audit.Details.Table['headings']} */
     const headings = [
       {key: 'url', itemType: 'url', text: str_(i18n.UIStrings.columnURL)},
       {key: 'total', granularity: 1, itemType: 'ms', text: str_(UIStrings.columnTotal)},
@@ -188,7 +177,7 @@ class BootupTime extends Audit {
 
     return {
       score,
-      numericValue: totalBootupTime,
+      rawValue: totalBootupTime,
       displayValue: totalBootupTime > 0 ?
         str_(i18n.UIStrings.seconds, {timeInMs: totalBootupTime}) : '',
       details,

@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const ManualAudit = require('./manual-audit.js');
+const ManualAudit = require('./manual-audit');
 
 /**
  * @fileoverview Manual PWA audit for janky-free page transitions.

@@ -6,7 +6,7 @@
  */
 'use strict';
 
-const ManualAudit = require('../../manual/manual-audit.js');
+const ManualAudit = require('../../manual/manual-audit');
 
 /**
  * @fileoverview Manual A11y audit to avoid trapping keyboard focus in a region.

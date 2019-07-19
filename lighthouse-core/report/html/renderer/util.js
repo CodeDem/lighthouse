@@ -16,12 +16,11 @@
  */
 'use strict';
 
-/* globals self, URL */
+/* globals self URL */
 
 const ELLIPSIS = '\u2026';
 const NBSP = '\xa0';
 const PASS_THRESHOLD = 0.9;
-const SCREENSHOT_PREFIX = 'data:image/jpeg;base64,';
 
 const RATINGS = {
   PASS: {label: 'pass', minScore: PASS_THRESHOLD},
@@ -29,14 +28,6 @@ const RATINGS = {
   FAIL: {label: 'fail'},
   ERROR: {label: 'error'},
 };
-
-// 25 most used tld plus one domains (aka public suffixes) from http archive.
-// @see https://github.com/GoogleChrome/lighthouse/pull/5065#discussion_r191926212
-// The canonical list is https://publicsuffix.org/learn/ but we're only using subset to conserve bytes
-const listOfTlds = [
-  'com', 'co', 'gov', 'edu', 'ac', 'org', 'go', 'gob', 'or', 'net', 'in', 'ne', 'nic', 'gouv',
-  'web', 'spb', 'blog', 'jus', 'kiev', 'mil', 'wi', 'qc', 'ca', 'bel', 'on',
-];
 
 class Util {
   static get PASS_THRESHOLD() {
@@ -49,8 +40,7 @@ class Util {
 
   /**
    * Returns a new LHR that's reshaped for slightly better ergonomics within the report rendereer.
-   * Also, sets up the localized UI strings used within renderer and makes changes to old LHRs to be
-   * compatible with current renderer.
+   * Also, sets up the localized UI strings used within renderer and number/date formatting
    * The LHR passed in is not mutated.
    * TODO(team): we all agree the LHR shape change is technical debt we should fix
    * @param {LH.Result} result
@@ -64,61 +54,19 @@ class Util {
     if (!clone.configSettings.locale) {
       clone.configSettings.locale = 'en';
     }
-
-    for (const audit of Object.values(clone.audits)) {
-      // Turn 'not-applicable' (LHR <4.0) and 'not_applicable' (older proto versions)
-      // into 'notApplicable' (LHR ≥4.0).
-      // @ts-ignore tsc rightly flags that these values shouldn't occur.
-      // eslint-disable-next-line max-len
-      if (audit.scoreDisplayMode === 'not_applicable' || audit.scoreDisplayMode === 'not-applicable') {
-        audit.scoreDisplayMode = 'notApplicable';
-      }
-
-      if (audit.details) {
-        // Turn `auditDetails.type` of undefined (LHR <4.2) and 'diagnostic' (LHR <5.0)
-        // into 'debugdata' (LHR ≥5.0).
-        // @ts-ignore tsc rightly flags that these values shouldn't occur.
-        if (audit.details.type === undefined || audit.details.type === 'diagnostic') {
-          audit.details.type = 'debugdata';
-        }
-
-        // Add the jpg data URL prefix to filmstrip screenshots without them (LHR <5.0).
-        if (audit.details.type === 'filmstrip') {
-          for (const screenshot of audit.details.items) {
-            if (!screenshot.data.startsWith(SCREENSHOT_PREFIX)) {
-              screenshot.data = SCREENSHOT_PREFIX + screenshot.data;
-            }
-          }
-        }
-      }
-    }
-
-    // Set locale for number/date formatting and grab localized renderer strings from the LHR.
     Util.setNumberDateLocale(clone.configSettings.locale);
     if (clone.i18n && clone.i18n.rendererFormattedStrings) {
       Util.updateAllUIStrings(clone.i18n.rendererFormattedStrings);
     }
 
-    // For convenience, smoosh all AuditResults into their auditRef (which has just weight & group)
     if (typeof clone.categories !== 'object') throw new Error('No categories provided.');
-    for (const category of Object.values(clone.categories)) {
-      category.auditRefs.forEach(auditRef => {
-        const result = clone.audits[auditRef.id];
-        auditRef.result = result;
+    clone.reportCategories = Object.values(clone.categories);
 
-        // attach the stackpacks to the auditRef object
-        if (clone.stackPacks) {
-          clone.stackPacks.forEach(pack => {
-            if (pack.descriptions[auditRef.id]) {
-              auditRef.stackPacks = auditRef.stackPacks || [];
-              auditRef.stackPacks.push({
-                title: pack.title,
-                iconDataURL: pack.iconDataURL,
-                description: pack.descriptions[auditRef.id],
-              });
-            }
-          });
-        }
+    // For convenience, smoosh all AuditResults into their auditDfn (which has just weight & group)
+    for (const category of clone.reportCategories) {
+      category.auditRefs.forEach(auditMeta => {
+        const result = clone.audits[auditMeta.id];
+        auditMeta.result = result;
       });
     }
 
@@ -137,6 +85,46 @@ class Util {
   }
 
   /**
+   * @param {string|Array<string|number>=} displayValue
+   * @return {string}
+   */
+  static formatDisplayValue(displayValue) {
+    if (typeof displayValue === 'string') return displayValue;
+    if (!displayValue) return '';
+
+    const replacementRegex = /%([0-9]*(\.[0-9]+)?d|s)/;
+    const template = /** @type {string} */ (displayValue[0]);
+    if (typeof template !== 'string') {
+      // First value should always be the format string, but we don't want to fail to build
+      // a report, return a placeholder.
+      return 'UNKNOWN';
+    }
+
+    let output = template;
+    for (const replacement of displayValue.slice(1)) {
+      if (!replacementRegex.test(output)) {
+        // eslint-disable-next-line no-console
+        console.warn('Too many replacements given');
+        break;
+      }
+
+      output = output.replace(replacementRegex, match => {
+        const granularity = Number(match.match(/[0-9.]+/)) || 1;
+        return match === '%s' ?
+          replacement.toLocaleString() :
+          (Math.round(Number(replacement) / granularity) * granularity).toLocaleString();
+      });
+    }
+
+    if (replacementRegex.test(output)) {
+      // eslint-disable-next-line no-console
+      console.warn('Not enough replacements given');
+    }
+
+    return output;
+  }
+
+  /**
    * Used to determine if the "passed" for the purposes of showing up in the "failed" or "passed"
    * sections of the report.
    *
@@ -146,7 +134,7 @@ class Util {
   static showAsPassed(audit) {
     switch (audit.scoreDisplayMode) {
       case 'manual':
-      case 'notApplicable':
+      case 'not-applicable':
         return true;
       case 'error':
       case 'informative':
@@ -166,7 +154,7 @@ class Util {
    */
   static calculateRating(score, scoreDisplayMode) {
     // Handle edge cases first, manual and not applicable receive 'pass', errored audits receive 'error'
-    if (scoreDisplayMode === 'manual' || scoreDisplayMode === 'notApplicable') {
+    if (scoreDisplayMode === 'manual' || scoreDisplayMode === 'not-applicable') {
       return RATINGS.PASS.label;
     } else if (scoreDisplayMode === 'error') {
       return RATINGS.ERROR.label;
@@ -365,51 +353,6 @@ class Util {
   }
 
   /**
-   * @param {string|URL} value
-   * @return {URL}
-   */
-  static createOrReturnURL(value) {
-    if (value instanceof URL) {
-      return value;
-    }
-
-    return new URL(value);
-  }
-
-  /**
-   * Gets the tld of a domain
-   *
-   * @param {string} hostname
-   * @return {string} tld
-   */
-  static getTld(hostname) {
-    const tlds = hostname.split('.').slice(-2);
-
-    if (!listOfTlds.includes(tlds[0])) {
-      return `.${tlds[tlds.length - 1]}`;
-    }
-
-    return `.${tlds.join('.')}`;
-  }
-
-  /**
-   * Returns a primary domain for provided hostname (e.g. www.example.com -> example.com).
-   * @param {string|URL} url hostname or URL object
-   * @returns {string}
-   */
-  static getRootDomain(url) {
-    const hostname = Util.createOrReturnURL(url).hostname;
-    const tld = Util.getTld(hostname);
-
-    // tld is .com or .co.uk which means we means that length is 1 to big
-    // .com => 2 & .co.uk => 3
-    const splitTld = tld.split('.');
-
-    // get TLD + root domain
-    return hostname.split('.').slice(-splitTld.length).join('.');
-  }
-
-  /**
    * @param {LH.Config.Settings} settings
    * @return {Array<{name: string, description: string}>}
    */
@@ -473,8 +416,10 @@ class Util {
     }
 
     let deviceEmulation = 'No emulation';
-    if (settings.emulatedFormFactor === 'mobile') deviceEmulation = 'Emulated Nexus 5X';
-    if (settings.emulatedFormFactor === 'desktop') deviceEmulation = 'Emulated Desktop';
+    if (!settings.disableDeviceEmulation) {
+      if (settings.emulatedFormFactor === 'mobile') deviceEmulation = 'Emulated Nexus 5X';
+      if (settings.emulatedFormFactor === 'desktop') deviceEmulation = 'Emulated Desktop';
+    }
 
     return {
       deviceEmulation,
@@ -493,55 +438,6 @@ class Util {
 
     // When testing, use a locale with more exciting numeric formatting
     if (Util.numberDateLocale === 'en-XA') Util.numberDateLocale = 'de';
-  }
-
-  /**
-   * Returns only lines that are near a message, or the first few lines if there are
-   * no line messages.
-   * @param {LH.Audit.Details.SnippetValue['lines']} lines
-   * @param {LH.Audit.Details.SnippetValue['lineMessages']} lineMessages
-   * @param {number} surroundingLineCount Number of lines to include before and after
-   * the message. If this is e.g. 2 this function might return 5 lines.
-   */
-  static filterRelevantLines(lines, lineMessages, surroundingLineCount) {
-    if (lineMessages.length === 0) {
-      // no lines with messages, just return the first bunch of lines
-      return lines.slice(0, surroundingLineCount * 2 + 1);
-    }
-
-    const minGapSize = 3;
-    const lineNumbersToKeep = new Set();
-    // Sort messages so we can check lineNumbersToKeep to see how big the gap to
-    // the previous line is.
-    lineMessages = lineMessages.sort((a, b) => (a.lineNumber || 0) - (b.lineNumber || 0));
-    lineMessages.forEach(({lineNumber}) => {
-      let firstSurroundingLineNumber = lineNumber - surroundingLineCount;
-      let lastSurroundingLineNumber = lineNumber + surroundingLineCount;
-
-      while (firstSurroundingLineNumber < 1) {
-        // make sure we still show (surroundingLineCount * 2 + 1) lines in total
-        firstSurroundingLineNumber++;
-        lastSurroundingLineNumber++;
-      }
-      // If only a few lines would be omitted normally then we prefer to include
-      // extra lines to avoid the tiny gap
-      if (lineNumbersToKeep.has(firstSurroundingLineNumber - minGapSize - 1)) {
-        firstSurroundingLineNumber -= minGapSize;
-      }
-      for (let i = firstSurroundingLineNumber; i <= lastSurroundingLineNumber; i++) {
-        const surroundingLineNumber = i;
-        lineNumbersToKeep.add(surroundingLineNumber);
-      }
-    });
-
-    return lines.filter(line => lineNumbersToKeep.has(line.lineNumber));
-  }
-
-  /**
-   * @param {string} categoryId
-   */
-  static isPluginCategory(categoryId) {
-    return categoryId.startsWith('lighthouse-plugin-');
   }
 }
 
@@ -571,8 +467,6 @@ Util.UIStrings = {
   warningHeader: 'Warnings: ',
   /** The tooltip text on an expandable chevron icon. Clicking the icon expands a section to reveal a list of audit results that was hidden by default. */
   auditGroupExpandTooltip: 'Show audits',
-  /** Section heading shown above a list of passed audits that contain warnings. Audits under this section do not negatively impact the score, but Lighthouse has generated some potentially actionable suggestions that should be reviewed. This section is expanded by default and displays after the failing audits. */
-  warningAuditsGroupTitle: 'Passed audits but with warnings',
   /** Section heading shown above a list of audits that are passing. 'Passed' here refers to a passing grade. This section is collapsed by default, as the user should be focusing on the failed audits instead. Users can click this heading to reveal the list. */
   passedAuditsGroupTitle: 'Passed audits',
   /** Section heading shown above a list of audits that do not apply to the page. For example, if an audit is 'Are images optimized?', but the page has no images on it, the audit will be marked as not applicable. This is neither passing or failing. This section is collapsed by default, as the user should be focusing on the failed audits instead. Users can click this heading to reveal the list. */
@@ -582,24 +476,18 @@ Util.UIStrings = {
 
   /** Label shown preceding any important warnings that may have invalidated the entire report. For example, if the user has Chrome extensions installed, they may add enough performance overhead that Lighthouse's performance metrics are unreliable. If shown, this will be displayed at the top of the report UI. */
   toplevelWarningsMessage: 'There were issues affecting this run of Lighthouse:',
+  /** Label preceding a pictorial explanation of the scoring scale: 0-50 is red (bad), 50-90 is orange (ok), 90-100 is green (good). These colors are used throughout the report to provide context for how good/bad a particular result is. */
+  scorescaleLabel: 'Score scale:',
 
   /** String of text shown in a graphical representation of the flow of network requests for the web page. This label represents the initial network request that fetches an HTML page. This navigation may be redirected (eg. Initial navigation to http://example.com redirects to https://www.example.com). */
   crcInitialNavigation: 'Initial Navigation',
   /** Label of value shown in the summary of critical request chains. Refers to the total amount of time (milliseconds) of the longest critical path chain/sequence of network requests. Example value: 2310 ms */
   crcLongestDurationLabel: 'Maximum critical path latency:',
 
-  /** Label for button that shows all lines of the snippet when clicked */
-  snippetExpandButtonLabel: 'Expand snippet',
-  /** Label for button that only shows a few lines of the snippet when clicked */
-  snippetCollapseButtonLabel: 'Collapse snippet',
-
   /** Explanation shown to users below performance results to inform them that the test was done with a 4G network connection and to warn them that the numbers they see will likely change slightly the next time they run Lighthouse. 'Lighthouse' becomes link text to additional documentation. */
   lsPerformanceCategoryDescription: '[Lighthouse](https://developers.google.com/web/tools/lighthouse/) analysis of the current page on an emulated mobile network. Values are estimated and may vary.',
   /** Title of the lab data section of the Performance category. Within this section are various speed metrics which quantify the pageload performance into values presented in seconds and milliseconds. "Lab" is an abbreviated form of "laboratory", and refers to the fact that the data is from a controlled test of a website, not measurements from real users visiting that site.  */
   labDataTitle: 'Lab Data',
-
-  /** This label is for a checkbox above a table of items loaded by a web page. The checkbox is used to show or hide third-party (or "3rd-party") resources in the table, where "third-party resources" refers to items loaded by a web page from URLs that aren't controlled by the owner of the web page. */
-  thirdPartyResourcesLabel: 'Show 3rd-party resources',
 };
 
 if (typeof module !== 'undefined' && module.exports) {

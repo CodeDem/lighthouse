@@ -10,21 +10,7 @@
 
 'use strict';
 
-const Audit = require('../audit.js');
-const i18n = require('../../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of a Lighthouse audit that provides detail on the Javascript libraries that are used on the page. */
-  title: 'Detected JavaScript libraries',
-  /** Description of a Lighthouse audit that tells the user what this audit is detecting. This is displayed after a user expands the section to see more. No character length limits. */
-  description: 'All front-end JavaScript libraries detected on the page.',
-  /** Label for a column in a data table; entries will be the names of the detected Javascript libraries.  */
-  columnName: 'Name',
-  /** Label for a column in a data table; entries will be the version numbers of the detected Javascript libraries.  */
-  columnVersion: 'Version',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
+const Audit = require('../audit');
 
 class JsLibrariesAudit extends Audit {
   /**
@@ -33,9 +19,9 @@ class JsLibrariesAudit extends Audit {
   static get meta() {
     return {
       id: 'js-libraries',
-      title: str_(UIStrings.title),
-      description: str_(UIStrings.description),
-      requiredArtifacts: ['Stacks'],
+      title: 'Detected JavaScript libraries',
+      description: 'All front-end JavaScript libraries detected on the page.',
+      requiredArtifacts: ['JSLibraries'],
     };
   }
 
@@ -44,27 +30,23 @@ class JsLibrariesAudit extends Audit {
    * @return {LH.Audit.Product}
    */
   static audit(artifacts) {
-    const libDetails = artifacts.Stacks
-      .filter(stack => stack.detector === 'js')
-      .map(stack => ({
-        name: stack.name,
-        version: stack.version,
-        npm: stack.npm,
-      }));
+    const libDetails = artifacts.JSLibraries.map(lib => ({
+      name: lib.name,
+      version: lib.version, // null if not detected
+      npm: lib.npmPkgName || null, // ~70% of libs come with this field
+    }));
 
-    /** @type {LH.Audit.Details.Table['headings']} */
     const headings = [
-      {key: 'name', itemType: 'text', text: str_(UIStrings.columnName)},
-      {key: 'version', itemType: 'text', text: str_(UIStrings.columnVersion)},
+      {key: 'name', itemType: 'text', text: 'Name'},
+      {key: 'version', itemType: 'text', text: 'Version'},
     ];
     const details = Audit.makeTableDetails(headings, libDetails, {});
 
     return {
-      score: 1, // Always pass for now.
+      rawValue: true, // Always pass for now.
       details,
     };
   }
 }
 
 module.exports = JsLibrariesAudit;
-module.exports.UIStrings = UIStrings;

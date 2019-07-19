@@ -9,7 +9,7 @@
 
 const pkg = require('../../package.json');
 const assert = require('assert');
-const lighthouse = require('../index.js');
+const lighthouse = require('..');
 
 describe('Module Tests', function() {
   it('should have a main attribute defined in the package.json', function() {
@@ -73,7 +73,7 @@ describe('Module Tests', function() {
     return lighthouse('chrome://version', {}, {
       passes: [{
         gatherers: [
-          'script-elements',
+          'viewport',
         ],
       }],
       audits: [
@@ -87,26 +87,22 @@ describe('Module Tests', function() {
       });
   });
 
-  it('should throw an error when the url is invalid', async () => {
-    expect.hasAssertions();
-    try {
-      await lighthouse('i-am-not-valid', {}, {});
-    } catch (err) {
-      expect(err.friendlyMessage)
-          .toBeDisplayString('The URL you have provided appears to be invalid.');
-      expect(err.code).toEqual('INVALID_URL');
-    }
+  it('should throw an error when the url is invalid', function() {
+    return lighthouse('https:/i-am-not-valid', {}, {})
+      .then(() => {
+        throw new Error('Should not have resolved when url is invalid');
+      }, err => {
+        assert.ok(err);
+      });
   });
 
-  it('should throw an error when the url is invalid protocol (file:///)', async () => {
-    expect.hasAssertions();
-    try {
-      await lighthouse('file:///a/fake/index.html', {}, {});
-    } catch (err) {
-      expect(err.friendlyMessage)
-          .toBeDisplayString('The URL you have provided appears to be invalid.');
-      expect(err.code).toEqual('INVALID_URL');
-    }
+  it('should throw an error when the url is invalid protocol (file:///)', function() {
+    return lighthouse('file:///a/fake/index.html', {}, {})
+      .then(() => {
+        throw new Error('Should not have resolved when url is file:///');
+      }, err => {
+        assert.ok(err);
+      });
   });
 
   it('should return formatted LHR when given no categories', function() {
@@ -132,31 +128,8 @@ describe('Module Tests', function() {
       assert.strictEqual(results.lhr.audits.viewport.score, 0);
       assert.ok(results.lhr.audits.viewport.explanation);
       assert.ok(results.lhr.timing);
-      assert.ok(results.lhr.timing.entries.length > 3, 'timing entries not populated');
+      assert.equal(typeof results.lhr.timing.total, 'number');
     });
-  });
-
-  it('should specify the channel as node by default', async function() {
-    const exampleUrl = 'https://www.reddit.com/r/nba';
-    const results = await lighthouse(exampleUrl, {}, {
-      settings: {
-        auditMode: __dirname + '/fixtures/artifacts/perflog/',
-      },
-      audits: [],
-    });
-    assert.equal(results.lhr.configSettings.channel, 'node');
-  });
-
-  it('lets consumers pass in a custom channel', async function() {
-    const exampleUrl = 'https://www.reddit.com/r/nba';
-    const results = await lighthouse(exampleUrl, {}, {
-      settings: {
-        auditMode: __dirname + '/fixtures/artifacts/perflog/',
-        channel: 'custom',
-      },
-      audits: [],
-    });
-    assert.equal(results.lhr.configSettings.channel, 'custom');
   });
 
   it('should return a list of audits', function() {

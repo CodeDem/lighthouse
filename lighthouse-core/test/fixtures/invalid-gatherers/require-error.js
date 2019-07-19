@@ -6,8 +6,7 @@
 'use strict';
 
 // NOTE: this require path does not resolve correctly.
-// eslint-disable-next-line local-rules/require-file-extension
-const LighthouseGatherer = require('../terrible/path/no/seriously/gatherer.js');
+const LighthouseGatherer = require('../terrible/path/no/seriously/gatherer');
 
 class CustomGatherer extends LighthouseGatherer {}
 

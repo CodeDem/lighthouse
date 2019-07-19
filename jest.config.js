@@ -11,17 +11,13 @@ module.exports = {
   collectCoverageFrom: [
     '**/lighthouse-core/**/*.js',
     '**/lighthouse-cli/**/*.js',
-    '**/lighthouse-viewer/**/*.js',
     '!**/test/',
     '!**/scripts/',
   ],
-  setupFilesAfterEnv: ['./lighthouse-core/test/test-utils.js'],
+  setupTestFrameworkScriptFile: './lighthouse-core/test/test-utils.js',
   testEnvironment: 'node',
   testMatch: [
     '**/lighthouse-core/**/*-test.js',
     '**/lighthouse-cli/**/*-test.js',
-    '**/lighthouse-viewer/**/*-test.js',
-    '**/lighthouse-viewer/**/*-test-pptr.js',
-    '**/clients/test/**/*-test.js',
   ],
 };

@@ -10,7 +10,7 @@
  * their site.
  */
 
-const Audit = require('../audit.js');
+const Audit = require('../audit');
 
 class ManualAudit extends Audit {
   /**
@@ -28,7 +28,7 @@ class ManualAudit extends Audit {
    */
   static audit() {
     return {
-      score: 0,
+      rawValue: false,
       // displayValue: '(needs manual verification)'
     };
   }

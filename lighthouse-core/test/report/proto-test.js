@@ -5,69 +5,68 @@
  */
 'use strict';
 
-const sampleJson = require('../results/sample_v2.json');
-const roundTripJson = require('../../../proto/sample_v2_round_trip.json');
+const path = require('path');
+const fs = require('fs');
+
+const sample = fs.readFileSync(path.resolve(__dirname, '../results/sample_v2.json'));
+const roundTripJson = require('../../../proto/sample_v2_round_trip');
 const preprocessor = require('../../lib/proto-preprocessor.js');
 
 /* eslint-env jest */
 
 describe('round trip JSON comparison subsets', () => {
-  let processedLHR;
+  let sampleJson;
 
   beforeEach(() => {
-    processedLHR = preprocessor.processForProto(sampleJson);
+    sampleJson = JSON.parse(preprocessor.processForProto(sample));
   });
 
-  it('has the same audit results and details (if applicable)', () => {
-    for (const auditId of Object.keys(processedLHR.audits)) {
-      expect(roundTripJson.audits[auditId]).toEqual(processedLHR.audits[auditId]);
-    }
+  it('has the same audit results sans details', () => {
+    Object.keys(sampleJson.audits).forEach(audit => {
+      delete sampleJson.audits[audit].details;
+    });
+
+    expect(roundTripJson.audits).toMatchObject(sampleJson.audits);
+  });
+
+  it('has the same audit results & details if applicable', () => {
+    Object.keys(sampleJson.audits).forEach(auditId => {
+      expect(roundTripJson.audits[auditId]).toMatchObject(sampleJson.audits[auditId]);
+
+      if ('details' in sampleJson.audits[auditId]) {
+        expect(roundTripJson.audits[auditId].details)
+          .toMatchObject(sampleJson.audits[auditId].details);
+      }
+    });
   });
 
   it('has the same i18n rendererFormattedStrings', () => {
-    expect(roundTripJson.i18n).toMatchObject(processedLHR.i18n);
+    expect(roundTripJson.i18n).toMatchObject(sampleJson.i18n);
   });
 
   it('has the same top level values', () => {
-    // Don't test all top level properties that are objects.
-    Object.keys(processedLHR).forEach(audit => {
-      if (typeof processedLHR[audit] === 'object' && !Array.isArray(processedLHR[audit])) {
-        delete processedLHR[audit];
+    Object.keys(sampleJson).forEach(audit => {
+      if (typeof sampleJson[audit] === 'object' && !Array.isArray(sampleJson[audit])) {
+        delete sampleJson[audit];
       }
     });
 
-    // Properties set to their type's default value will be omitted in the roundTripJson.
-    // For an explicit list of properties, remove sampleJson values if set to a default.
-    if (Array.isArray(processedLHR.stackPacks) && processedLHR.stackPacks.length === 0) {
-      delete processedLHR.stackPacks;
-    }
-
-    expect(roundTripJson).toMatchObject(processedLHR);
+    expect(roundTripJson).toMatchObject(sampleJson);
   });
 
   it('has the same config values', () => {
-    // Config settings from proto round trip should be a subset of the actual settings.
-    expect(processedLHR.configSettings).toMatchObject(roundTripJson.configSettings);
+    expect(roundTripJson.configSettings).toMatchObject(sampleJson.configSettings);
   });
 });
 
 describe('round trip JSON comparison to everything', () => {
-  let processedLHR;
+  let sampleJson;
 
   beforeEach(() => {
-    processedLHR = preprocessor.processForProto(sampleJson);
-
-    // Proto conversion turns empty summaries into null. This is OK,
-    // and is handled in the PSI roundtrip just fine, but messes up the easy
-    // jest sub-object matcher. So, we put the empty object back in its place.
-    for (const audit of Object.values(roundTripJson.audits)) {
-      if (audit.details && audit.details.summary === null) {
-        audit.details.summary = {};
-      }
-    }
+    sampleJson = JSON.parse(preprocessor.processForProto(sample));
   });
 
   it('has the same JSON overall', () => {
-    expect(processedLHR).toMatchObject(roundTripJson);
+    expect(roundTripJson).toMatchObject(sampleJson);
   });
 });

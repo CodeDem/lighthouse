@@ -8,6 +8,10 @@
     "strict": true,
     // "listFiles": true,
     // "noErrorTruncation": true,
+    "typeRoots": [
+      "@types",
+      "./typings"
+    ],
 
     "resolveJsonModule": true,
     "diagnostics": true
@@ -15,14 +19,13 @@
   "include": [
     "lighthouse-cli/**/*.js",
     "lighthouse-core/**/*.js",
-    "clients/**/*.js",
-    "build/**/*.js",
-    "./types/**/*.d.ts",
-    "eslint-local-rules.js",
+    "lighthouse-extension/app/src/*.js",
+    "./typings/*.d.ts",
   ],
   "exclude": [
+    "lighthouse-cli/test/**/*.js",
     "lighthouse-core/test/**/*.js",
-    "clients/test/**/*.js",
-    "lighthouse-cli/test/fixtures/**/*.js",
+    "lighthouse-core/closure/**/*.js",
+    "lighthouse-core/third_party/src/**/*.js",
   ]
 }

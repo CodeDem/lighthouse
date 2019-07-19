@@ -10,21 +10,7 @@
  * See base class in axe-audit.js for audit() implementation.
  */
 
-const AxeAudit = require('./axe-audit.js');
-const i18n = require('../../lib/i18n/i18n.js');
-
-const UIStrings = {
-  /** Title of an accesibility audit that evaluates if all definition list item elements (`<dt>`/`<dd>`) have a definition list parent element (`<dl>`). This title is descriptive of the successful state and is shown to users when no user action is required. */
-  title: 'Definition list items are wrapped in `<dl>` elements',
-  /** Title of an accesibility audit that evaluates if all definition list item elements (`<dt>`/`<dd>`) have a definition list parent element (`<dl>`). This title is descriptive of the failing state and is shown to users when there is a failure that needs to be addressed. */
-  failureTitle: 'Definition list items are not wrapped in `<dl>` elements',
-  /** Description of a Lighthouse audit that tells the user *why* they should try to pass. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
-  description: 'Definition list items (`<dt>` and `<dd>`) must be wrapped in a ' +
-      'parent `<dl>` element to ensure that screen readers can properly announce them. ' +
-      '[Learn more](https://dequeuniversity.com/rules/axe/3.1/dlitem?application=lighthouse).',
-};
-
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
+const AxeAudit = require('./axe-audit');
 
 class DLItem extends AxeAudit {
   /**
@@ -33,13 +19,14 @@ class DLItem extends AxeAudit {
   static get meta() {
     return {
       id: 'dlitem',
-      title: str_(UIStrings.title),
-      failureTitle: str_(UIStrings.failureTitle),
-      description: str_(UIStrings.description),
+      title: 'Definition list items are wrapped in `<dl>` elements',
+      failureTitle: 'Definition list items are not wrapped in `<dl>` elements',
+      description: 'Definition list items (`<dt>` and `<dd>`) must be wrapped in a ' +
+          'parent `<dl>` element to ensure that screen readers can properly announce them. ' +
+          '[Learn more](https://dequeuniversity.com/rules/axe/2.2/dlitem?application=lighthouse).',
       requiredArtifacts: ['Accessibility'],
     };
   }
 }
 
 module.exports = DLItem;
-module.exports.UIStrings = UIStrings;

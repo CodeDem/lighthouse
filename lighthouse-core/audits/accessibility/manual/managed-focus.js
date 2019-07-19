@@ -6,7 +6,7 @@
  */
 'use strict';
 
-const ManualAudit = require('../../manual/manual-audit.js');
+const ManualAudit = require('../../manual/manual-audit');
 
 /**
  * @fileoverview Manual A11y audit for focusing new content that's added to the page.

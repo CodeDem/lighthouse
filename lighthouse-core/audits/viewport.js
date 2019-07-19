@@ -5,8 +5,8 @@
  */
 'use strict';
 
-const Audit = require('./audit.js');
-const ComputedViewportMeta = require('../computed/viewport-meta.js');
+const Audit = require('./audit');
+const Parser = require('metaviewport-parser');
 
 class Viewport extends Audit {
   /**
@@ -20,28 +20,38 @@ class Viewport extends Audit {
           'or `initial-scale`',
       description: 'Add a viewport meta tag to optimize your app for mobile screens. ' +
           '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/has-viewport-meta-tag).',
-      requiredArtifacts: ['MetaElements'],
+      requiredArtifacts: ['Viewport'],
     };
   }
 
   /**
    * @param {LH.Artifacts} artifacts
-   * @param {LH.Audit.Context} context
-   * @return {Promise<LH.Audit.Product>}
+   * @return {LH.Audit.Product}
    */
-  static async audit(artifacts, context) {
-    const viewportMeta = await ComputedViewportMeta.request(artifacts.MetaElements, context);
-
-    if (!viewportMeta.hasViewportTag) {
+  static audit(artifacts) {
+    if (artifacts.Viewport === null) {
       return {
-        score: 0,
         explanation: 'No viewport meta tag found',
+        rawValue: false,
       };
     }
 
+    const warnings = [];
+    const parsedProps = Parser.parseMetaViewPortContent(artifacts.Viewport);
+
+    if (Object.keys(parsedProps.unknownProperties).length) {
+      warnings.push(`Invalid properties found: ${JSON.stringify(parsedProps.unknownProperties)}`);
+    }
+    if (Object.keys(parsedProps.invalidValues).length) {
+      warnings.push(`Invalid values found: ${JSON.stringify(parsedProps.invalidValues)}`);
+    }
+
+    const viewportProps = parsedProps.validProperties;
+    const hasMobileViewport = viewportProps.width || viewportProps['initial-scale'];
+
     return {
-      score: Number(viewportMeta.isMobileOptimized),
-      warnings: viewportMeta.parserWarnings,
+      rawValue: !!hasMobileViewport,
+      warnings,
     };
   }
 }

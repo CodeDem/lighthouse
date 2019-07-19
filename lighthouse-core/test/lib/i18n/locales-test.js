@@ -11,26 +11,10 @@ const assert = require('assert');
 /* eslint-env jest */
 
 describe('locales', () => {
-  it('has only canonical (or expected-deprecated) language tags', () => {
-    // Map of deprecated codes to their canonical version. Depending on the ICU
-    // version used to run Lighthouse/this test, these *may* come back as their
-    // substitute, not themselves.
-    const deprecatedCodes = {
-      in: 'id',
-      iw: 'he',
-      mo: 'ro',
-    };
-
+  it('has only canonical language tags', () => {
     for (const locale of Object.keys(locales)) {
       const canonicalLocale = Intl.getCanonicalLocales(locale)[0];
-      const substitute = deprecatedCodes[locale];
-      assert.ok(locale === canonicalLocale || substitute === canonicalLocale,
-        `locale code '${locale}' not canonical ('${canonicalLocale}' found instead)`);
-    }
-
-    // Deprecation subsitutes should be removed from the test if no longer used.
-    for (const locale of Object.keys(deprecatedCodes)) {
-      assert.ok(locales[locale], `${locale} substitute should be removed from test`);
+      assert.strictEqual(locale, canonicalLocale);
     }
   });
 

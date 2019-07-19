@@ -6,7 +6,7 @@
 'use strict';
 
 const assert = require('assert');
-const ReportScoring = require('../scoring.js');
+const ReportScoring = require('../scoring');
 
 /* eslint-env jest */
 describe('ReportScoring', () => {
@@ -35,7 +35,7 @@ describe('ReportScoring', () => {
   describe('#scoreAllCategories', () => {
     it('should score the categories', () => {
       const resultsByAuditId = {
-        'my-audit': {score: 0},
+        'my-audit': {rawValue: 'you passed', score: 0},
         'my-boolean-audit': {score: 1, extendedInfo: {}},
         'my-scored-audit': {score: 1},
         'my-failed-audit': {score: 0.2},
@@ -64,9 +64,9 @@ describe('ReportScoring', () => {
 
     it('should weight notApplicable audits as 0', () => {
       const resultsByAuditId = {
-        'my-boolean-audit': {score: 1, extendedInfo: {}, scoreDisplayMode: 'notApplicable'},
+        'my-boolean-audit': {score: 1, extendedInfo: {}, scoreDisplayMode: 'not-applicable'},
         'my-scored-audit': {score: 1},
-        'my-failed-audit': {score: 0.2, scoreDisplayMode: 'notApplicable'},
+        'my-failed-audit': {score: 0.2, scoreDisplayMode: 'not-applicable'},
         'my-boolean-failed-audit': {score: 0},
       };
 

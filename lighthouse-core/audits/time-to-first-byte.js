@@ -5,9 +5,9 @@
  */
 'use strict';
 
-const Audit = require('./audit.js');
+const Audit = require('./audit');
 const i18n = require('../lib/i18n/i18n.js');
-const MainResource = require('../computed/main-resource.js');
+const MainResource = require('../gather/computed/main-resource.js');
 
 const UIStrings = {
   /** Title of a diagnostic audit that provides detail on how long it took from starting a request to when the server started responding. This descriptive title is shown to users when the amount is acceptable and no user action is required. */
@@ -60,7 +60,7 @@ class TTFBMetric extends Audit {
     const passed = ttfb < TTFB_THRESHOLD;
     const displayValue = str_(UIStrings.displayValue, {timeInMs: ttfb});
 
-    /** @type {LH.Audit.Details.Opportunity} */
+    /** @type {LH.Result.Audit.OpportunityDetails} */
     const details = {
       type: 'opportunity',
       overallSavingsMs: ttfb - TTFB_THRESHOLD,
@@ -69,7 +69,7 @@ class TTFBMetric extends Audit {
     };
 
     return {
-      numericValue: ttfb,
+      rawValue: ttfb,
       score: Number(passed),
       displayValue,
       details,

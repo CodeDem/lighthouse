@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const Audit = require('./audit.js');
+const Audit = require('./audit');
 
 class WithoutJavaScript extends Audit {
   /**
@@ -33,13 +33,13 @@ class WithoutJavaScript extends Audit {
     // Fail pages that have empty text and are missing a noscript tag
     if (artifact.bodyText.trim() === '' && !artifact.hasNoScript) {
       return {
-        score: 0,
+        rawValue: false,
         explanation: 'The page body should render some content if its scripts are not available.',
       };
     }
 
     return {
-      score: 1,
+      rawValue: true,
     };
   }
 }
