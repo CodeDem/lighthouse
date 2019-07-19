@@ -13,9 +13,9 @@
  */
 'use strict';
 
-const ByteEfficiencyAudit = require('./byte-efficiency-audit');
-const Sentry = require('../../lib/sentry');
-const URL = require('../../lib/url-shim');
+const ByteEfficiencyAudit = require('./byte-efficiency-audit.js');
+const Sentry = require('../../lib/sentry.js');
+const URL = require('../../lib/url-shim.js');
 const i18n = require('../../lib/i18n/i18n.js');
 
 const UIStrings = {
@@ -42,26 +42,26 @@ class UsesResponsiveImages extends ByteEfficiencyAudit {
       title: str_(UIStrings.title),
       description: str_(UIStrings.description),
       scoreDisplayMode: ByteEfficiencyAudit.SCORING_MODES.NUMERIC,
-      requiredArtifacts: ['ImageUsage', 'ViewportDimensions', 'devtoolsLogs', 'traces'],
+      requiredArtifacts: ['ImageElements', 'ViewportDimensions', 'devtoolsLogs', 'traces'],
     };
   }
 
   /**
-   * @param {LH.Artifacts.SingleImageUsage} image
+   * @param {LH.Artifacts.ImageElement} image
    * @param {number} DPR devicePixelRatio
    * @return {null|Error|LH.Audit.ByteEfficiencyItem};
    */
   static computeWaste(image, DPR) {
     // Nothing can be done without network info.
-    if (!image.networkRecord) {
+    if (!image.resourceSize) {
       return null;
     }
 
     const url = URL.elideDataURI(image.src);
     const actualPixels = image.naturalWidth * image.naturalHeight;
-    const usedPixels = image.clientWidth * image.clientHeight * Math.pow(DPR, 2);
+    const usedPixels = image.displayedWidth * image.displayedHeight * Math.pow(DPR, 2);
     const wastedRatio = 1 - (usedPixels / actualPixels);
-    const totalBytes = image.networkRecord.resourceSize;
+    const totalBytes = image.resourceSize;
     const wastedBytes = Math.round(totalBytes * wastedRatio);
 
     // If the image has 0 dimensions, it's probably hidden/offscreen, so let the offscreen-images
@@ -87,26 +87,29 @@ class UsesResponsiveImages extends ByteEfficiencyAudit {
    * @return {ByteEfficiencyAudit.ByteEfficiencyProduct}
    */
   static audit_(artifacts) {
-    const images = artifacts.ImageUsage;
+    const images = artifacts.ImageElements;
     const DPR = artifacts.ViewportDimensions.devicePixelRatio;
 
     /** @type {string[]} */
     const warnings = [];
     /** @type {Map<string, LH.Audit.ByteEfficiencyItem>} */
     const resultsMap = new Map();
-    images.forEach(image => {
-      // TODO: give SVG a free pass until a detail per pixel metric is available
-      if (!image.networkRecord || image.networkRecord.mimeType === 'image/svg+xml') {
-        return;
+    for (const image of images) {
+      // Ignore images without resource size information.
+      // Give SVG a free pass because creating a "responsive" SVG is of questionable value.
+      // Ignore CSS images because it's difficult to determine what is a spritesheet,
+      // and the reward-to-effort ratio for responsive CSS images is quite low https://css-tricks.com/responsive-images-css/.
+      if (!image.resourceSize || image.mimeType === 'image/svg+xml' || image.isCss) {
+        continue;
       }
 
       const processed = UsesResponsiveImages.computeWaste(image, DPR);
-      if (!processed) return;
+      if (!processed) continue;
 
       if (processed instanceof Error) {
         warnings.push(processed.message);
         Sentry.captureException(processed, {tags: {audit: this.meta.id}, level: 'warning'});
-        return;
+        continue;
       }
 
       // Don't warn about an image that was later used appropriately
@@ -114,12 +117,12 @@ class UsesResponsiveImages extends ByteEfficiencyAudit {
       if (!existing || existing.wastedBytes > processed.wastedBytes) {
         resultsMap.set(processed.url, processed);
       }
-    });
+    }
 
     const items = Array.from(resultsMap.values())
         .filter(item => item.wastedBytes > IGNORE_THRESHOLD_IN_BYTES);
 
-    /** @type {LH.Result.Audit.OpportunityDetails['headings']} */
+    /** @type {LH.Audit.Details.Opportunity['headings']} */
     const headings = [
       {key: 'url', valueType: 'thumbnail', label: ''},
       {key: 'url', valueType: 'url', label: str_(i18n.UIStrings.columnURL)},

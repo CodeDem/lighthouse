@@ -5,12 +5,12 @@
  */
 'use strict';
 
-/* global window, document, Node, getOuterHTMLSnippet */
+/* global window, document, getOuterHTMLSnippet, getNodePath, getNodeLabel */
 
-const Gatherer = require('./gatherer');
+const Gatherer = require('./gatherer.js');
 const fs = require('fs');
 const axeLibSource = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
-const pageFunctions = require('../../lib/page-functions');
+const pageFunctions = require('../../lib/page-functions.js');
 
 /**
  * This is run in the page, not Lighthouse itself.
@@ -33,21 +33,34 @@ function runA11yChecks() {
     resultTypes: ['violations', 'inapplicable'],
     rules: {
       'tabindex': {enabled: true},
+      'accesskeys': {enabled: true},
       'table-fake-caption': {enabled: false},
       'td-has-header': {enabled: false},
       'marquee': {enabled: false},
       'area-alt': {enabled: false},
+      'aria-dpub-role-fallback': {enabled: false},
+      'aria-hidden-body': {enabled: false},
+      'duplicate-id-active': {enabled: false},
+      'duplicate-id-aria': {enabled: false},
+      'html-xml-lang-mismatch': {enabled: false},
       'blink': {enabled: false},
       'server-side-image-map': {enabled: false},
+      'aria-hidden-focus': {enabled: false},
+      'form-field-multiple-labels': {enabled: false},
+      'aria-input-field-name': {enabled: false},
+      'aria-toggle-field-name': {enabled: false},
     },
     // @ts-ignore
   }).then(axeResult => {
     // Augment the node objects with outerHTML snippet & custom path string
     // @ts-ignore
     axeResult.violations.forEach(v => v.nodes.forEach(node => {
+      // @ts-ignore - getNodePath put into scope via stringification
       node.path = getNodePath(node.element);
       // @ts-ignore - getOuterHTMLSnippet put into scope via stringification
       node.snippet = getOuterHTMLSnippet(node.element);
+      // @ts-ignore - getNodeLabel put into scope via stringification
+      node.nodeLabel = getNodeLabel(node.element);
       // avoid circular JSON concerns
       node.element = node.any = node.all = node.none = undefined;
     }));
@@ -56,37 +69,6 @@ function runA11yChecks() {
     axeResult = {violations: axeResult.violations, notApplicable: axeResult.inapplicable};
     return axeResult;
   });
-
-  /**
-   * Adapted from DevTools' SDK.DOMNode.prototype.path
-   *   https://github.com/ChromeDevTools/devtools-frontend/blob/7a2e162ddefd/front_end/sdk/DOMModel.js#L530-L552
-   * TODO: Doesn't handle frames or shadow roots...
-   * @param {Node} node
-   */
-  function getNodePath(node) {
-    /** @param {Node} node */
-    function getNodeIndex(node) {
-      let index = 0;
-      let prevNode;
-      while (prevNode = node.previousSibling) {
-        node = prevNode;
-        // skip empty text nodes
-        if (node.nodeType === Node.TEXT_NODE && node.textContent &&
-          node.textContent.trim().length === 0) continue;
-        index++;
-      }
-      return index;
-    }
-
-    const path = [];
-    while (node && node.parentNode) {
-      const index = getNodeIndex(node);
-      path.push([index, node.nodeName]);
-      node = node.parentNode;
-    }
-    path.reverse();
-    return path.join(',');
-  }
 }
 
 class Accessibility extends Gatherer {
@@ -98,6 +80,8 @@ class Accessibility extends Gatherer {
     const driver = passContext.driver;
     const expression = `(function () {
       ${pageFunctions.getOuterHTMLSnippetString};
+      ${pageFunctions.getNodePathString};
+      ${pageFunctions.getNodeLabelString};
       ${axeLibSource};
       return (${runA11yChecks.toString()}());
     })()`;

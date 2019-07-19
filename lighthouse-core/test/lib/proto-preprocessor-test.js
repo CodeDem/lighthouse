@@ -5,16 +5,87 @@
  */
 'use strict';
 
-const processForProto = require('../../lib/proto-preprocessor').processForProto;
+const {processForProto} = require('../../lib/proto-preprocessor.js');
+const sampleJson = require('../results/sample_v2.json');
 
 /* eslint-env jest */
 describe('processing for proto', () => {
+  it('doesn\'t modify the input object', () => {
+    const input = JSON.parse(JSON.stringify(sampleJson));
+    processForProto(input);
+    expect(input).toEqual(sampleJson);
+  });
+
+  it('keeps only necessary configSettings', () => {
+    const input = {
+      'configSettings': {
+        'output': [
+          'json',
+        ],
+        'maxWaitForLoad': 45000,
+        'throttlingMethod': 'devtools',
+        'throttling': {
+          'rttMs': 150,
+          'throughputKbps': 1638.4,
+          'requestLatencyMs': 562.5,
+          'downloadThroughputKbps': 1474.5600000000002,
+          'uploadThroughputKbps': 675,
+          'cpuSlowdownMultiplier': 4,
+        },
+        'gatherMode': false,
+        'disableStorageReset': false,
+        'emulatedFormFactor': 'mobile',
+        'locale': 'en-US',
+        'blockedUrlPatterns': null,
+        'additionalTraceCategories': null,
+        'extraHeaders': null,
+        'onlyAudits': null,
+        'onlyCategories': null,
+        'skipAudits': null,
+      },
+    };
+    const expectation = {
+      'configSettings': {
+        'emulatedFormFactor': 'mobile',
+        'locale': 'en-US',
+        'onlyCategories': null,
+      },
+    };
+    const output = processForProto(input);
+
+    expect(output).toMatchObject(expectation);
+  });
+
+  it('cleans up default runtimeErrors', () => {
+    const input = {
+      'runtimeError': {
+        'code': 'NO_ERROR',
+      },
+    };
+
+    const output = processForProto(input);
+
+    expect(output).not.toHaveProperty('runtimeError');
+  });
+
+  it('non-default runtimeErrors are untouched', () => {
+    const input = {
+      'runtimeError': {
+        'code': 'ERROR_NO_DOCUMENT_REQUEST',
+      },
+    };
+
+    const output = processForProto(input);
+
+    expect(output).toMatchObject(input);
+  });
+
   it('cleans up audits', () => {
     const input = {
       'audits': {
         'critical-request-chains': {
           'scoreDisplayMode': 'not-applicable',
-          'rawValue': 14.3,
+          'numericValue': 14.3,
           'displayValue': ['hello %d', 123],
         },
       },
@@ -22,14 +93,14 @@ describe('processing for proto', () => {
     const expectation = {
       'audits': {
         'critical-request-chains': {
-          'scoreDisplayMode': 'not_applicable',
+          'scoreDisplayMode': 'notApplicable',
           'displayValue': 'hello %d | 123',
         },
       },
     };
-    const output = processForProto(JSON.stringify(input));
+    const output = processForProto(input);
 
-    expect(JSON.parse(output)).toMatchObject(expectation);
+    expect(output).toMatchObject(expectation);
   });
 
 
@@ -44,9 +115,9 @@ describe('processing for proto', () => {
     const expectation = {
       'i18n': {},
     };
-    const output = processForProto(JSON.stringify(input));
+    const output = processForProto(input);
 
-    expect(JSON.parse(output)).toMatchObject(expectation);
+    expect(output).toMatchObject(expectation);
   });
 
   it('removes empty strings', () => {
@@ -87,8 +158,8 @@ describe('processing for proto', () => {
         ],
       },
     };
-    const output = processForProto(JSON.stringify(input));
+    const output = processForProto(input);
 
-    expect(JSON.parse(output)).toMatchObject(expectation);
+    expect(output).toMatchObject(expectation);
   });
 });

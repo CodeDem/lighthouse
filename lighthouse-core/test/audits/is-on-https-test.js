@@ -27,8 +27,8 @@ describe('Security: HTTPS audit', () => {
       {url: 'http://insecure.com/image2.jpeg', parsedURL: {scheme: 'http', host: 'insecure.com'}},
       {url: 'https://google.com/', parsedURL: {scheme: 'https', host: 'google.com'}},
     ]), {computedCache: new Map()}).then(result => {
-      assert.strictEqual(result.rawValue, false);
-      assert.ok(result.displayValue.includes('requests found'));
+      assert.strictEqual(result.score, 0);
+      expect(result.displayValue).toBeDisplayString('2 insecure requests found');
       assert.strictEqual(result.extendedInfo.value.length, 2);
     });
   });
@@ -39,8 +39,8 @@ describe('Security: HTTPS audit', () => {
       {url: 'http://insecure.com/image.jpeg', parsedURL: {scheme: 'http', host: 'insecure.com'}},
       {url: 'https://google.com/', parsedURL: {scheme: 'https', host: 'google.com'}},
     ]), {computedCache: new Map()}).then(result => {
-      assert.strictEqual(result.rawValue, false);
-      assert.ok(result.displayValue.includes('request found'));
+      assert.strictEqual(result.score, 0);
+      expect(result.displayValue).toBeDisplayString('1 insecure request found');
       assert.deepEqual(result.extendedInfo.value[0], {url: 'http://insecure.com/image.jpeg'});
     });
   });
@@ -51,7 +51,7 @@ describe('Security: HTTPS audit', () => {
       {url: 'http://localhost/image.jpeg', parsedURL: {scheme: 'http', host: 'localhost'}},
       {url: 'https://google.com/', parsedURL: {scheme: 'https', host: 'google.com'}},
     ]), {computedCache: new Map()}).then(result => {
-      assert.strictEqual(result.rawValue, true);
+      assert.strictEqual(result.score, 1);
     });
   });
 

@@ -10,10 +10,10 @@
 
 'use strict';
 
-const Audit = require('./audit');
-const {taskGroups} = require('../lib/task-groups');
+const Audit = require('./audit.js');
+const {taskGroups} = require('../lib/tracehouse/task-groups.js');
 const i18n = require('../lib/i18n/i18n.js');
-const MainThreadTasks = require('../gather/computed/main-thread-tasks.js');
+const MainThreadTasks = require('../computed/main-thread-tasks.js');
 
 const UIStrings = {
   /** Title of a diagnostic audit that provides detail on the main thread work the browser did to load the page. This descriptive title is shown to users when the amount is acceptable and no user action is required. */
@@ -29,7 +29,7 @@ const UIStrings = {
 
 const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
 
-/** @typedef {import('../lib/task-groups.js').TaskGroupIds} TaskGroupIds */
+/** @typedef {import('../lib/tracehouse/task-groups.js').TaskGroupIds} TaskGroupIds */
 
 class MainThreadWorkBreakdown extends Audit {
   /**
@@ -105,6 +105,7 @@ class MainThreadWorkBreakdown extends Audit {
       };
     });
 
+    /** @type {LH.Audit.Details.Table['headings']} */
     const headings = [
       {key: 'groupLabel', itemType: 'text', text: str_(UIStrings.columnCategory)},
       {key: 'duration', itemType: 'ms', granularity: 1, text: str_(i18n.UIStrings.columnTimeSpent)},
@@ -121,7 +122,7 @@ class MainThreadWorkBreakdown extends Audit {
 
     return {
       score,
-      rawValue: totalExecutionTime,
+      numericValue: totalExecutionTime,
       displayValue: str_(i18n.UIStrings.seconds, {timeInMs: totalExecutionTime}),
       details: tableDetails,
     };

@@ -3,13 +3,13 @@ node_modules
 npm-debug.log
 .vscode
 .tmp
+.idea
 
-lighthouse-extension/dist
-lighthouse-core/third_party/src
-**/pages/scripts/lighthouse-report.js
+/dist
 coverage
 lcov.info
 .nyc_output
+*.lcov
 
 lighthouse-cli/results
 results.html
@@ -38,8 +38,6 @@ yarn-error.log
 /chrome-linux/
 /chrome-win32/
 /chrome.zip
-
-plots/out**
 
 *__pycache__
 *.pyc

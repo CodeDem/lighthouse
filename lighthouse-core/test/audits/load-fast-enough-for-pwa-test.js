@@ -5,8 +5,8 @@
  */
 'use strict';
 
-const FastPWAAudit = require('../../audits/load-fast-enough-for-pwa');
-const mobileSlow4GThrottling = require('../../config/constants').throttling.mobileSlow4G;
+const FastPWAAudit = require('../../audits/load-fast-enough-for-pwa.js');
+const mobileSlow4GThrottling = require('../../config/constants.js').throttling.mobileSlow4G;
 const assert = require('assert');
 const createTestTrace = require('../create-test-trace.js');
 const networkRecordsToDevtoolsLog = require('../network-records-to-devtools-log.js');
@@ -26,7 +26,7 @@ describe('PWA: load-fast-enough-for-pwa audit', () => {
     const settings = {throttlingMethod: 'devtools', throttling: mobileSlow4GThrottling};
     return FastPWAAudit.audit(artifacts, {settings, computedCache: new Map()}).then(result => {
       assert.equal(result.score, true, 'fixture trace is not passing audit');
-      assert.equal(result.rawValue, 1582.189);
+      assert.equal(result.numericValue, 1582.189);
     });
   });
 
@@ -50,8 +50,8 @@ describe('PWA: load-fast-enough-for-pwa audit', () => {
     const settings = {throttlingMethod: 'devtools', throttling: mobileSlow4GThrottling};
     return FastPWAAudit.audit(artifacts, {settings, computedCache: new Map()}).then(result => {
       assert.equal(result.score, false, 'not failing a long TTI value');
-      assert.equal(result.rawValue, 15000);
-      assert.deepEqual(result.displayValue, ['Interactive at %d\xa0s', 15]);
+      assert.equal(result.numericValue, 15000);
+      expect(result.displayValue).toBeDisplayString('Interactive at 15.0\xa0s');
       assert.ok(result.explanation);
     });
   });
@@ -64,7 +64,7 @@ describe('PWA: load-fast-enough-for-pwa audit', () => {
 
     const settings = {throttlingMethod: 'devtools', throttling: mobileSlow4GThrottling};
     const result = await FastPWAAudit.audit(artifacts, {settings, computedCache: new Map()});
-    assert.equal(Math.round(result.rawValue), 1582);
+    assert.equal(Math.round(result.numericValue), 1582);
   });
 
   it('overrides with simulated result when throttling is modified', async () => {
@@ -75,7 +75,41 @@ describe('PWA: load-fast-enough-for-pwa audit', () => {
 
     const settings = {throttlingMethod: 'provided', throttling: {rttMs: 40, throughput: 100000}};
     const result = await FastPWAAudit.audit(artifacts, {settings, computedCache: new Map()});
-    expect(result.rawValue).toBeGreaterThan(2000);
-    expect(Math.round(result.rawValue)).toMatchSnapshot();
+    expect(result.numericValue).toBeGreaterThan(2000); // If not overridden this would be 1582
+    expect(Math.round(result.numericValue)).toMatchSnapshot();
+  });
+
+  it('overrides when throttling is modified but method is not "provided"', async () => {
+    const artifacts = {
+      traces: {defaultPass: trace},
+      devtoolsLogs: {defaultPass: devtoolsLog},
+    };
+
+    const settings = {throttlingMethod: 'devtools', throttling: {rttMs: 40, throughput: 100000}};
+    const result = await FastPWAAudit.audit(artifacts, {settings, computedCache: new Map()});
+    expect(result.numericValue).toBeGreaterThan(2000); // If not overridden this would be 1582
+  });
+
+  it('overrides when throttling is "provided" and fails the simulated TTI value', async () => {
+    const topLevelTasks = [
+      {ts: 1000, duration: 1000},
+      {ts: 3000, duration: 1000},
+      {ts: 5000, duration: 1000},
+      {ts: 9000, duration: 1000},
+      {ts: 12000, duration: 1000},
+      {ts: 14900, duration: 1000},
+    ];
+    const longTrace = createTestTrace({navigationStart: 0, traceEnd: 20000, topLevelTasks});
+
+    const artifacts = {
+      traces: {defaultPass: longTrace},
+      devtoolsLogs: {defaultPass: devtoolsLog},
+    };
+
+    const settings = {throttlingMethod: 'provided', throttling: {rttMs: 40, throughput: 100000}};
+    const result = await FastPWAAudit.audit(artifacts, {settings, computedCache: new Map()});
+    expect(result.displayValue)
+      .toBeDisplayString('Interactive on simulated mobile network at 24.9\xa0s');
+    expect(result.numericValue).toBeGreaterThan(10000);
   });
 });

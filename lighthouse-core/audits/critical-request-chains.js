@@ -5,9 +5,9 @@
  */
 'use strict';
 
-const Audit = require('./audit');
+const Audit = require('./audit.js');
 const i18n = require('../lib/i18n/i18n.js');
-const ComputedChains = require('../gather/computed/critical-request-chains.js');
+const ComputedChains = require('../computed/critical-request-chains.js');
 
 const UIStrings = {
   /** Imperative title of a Lighthouse audit that tells the user to reduce the depth of critical network requests to enhance initial load of a page. Critical request chains are series of dependent network requests that are important for page rendering. For example, here's a 4-request-deep chain: The biglogo.jpg image is required, but is requested via the styles.css style code, which is requested by the initialize.js javascript, which is requested by the page's HTML. This is displayed in a list of audit titles that Lighthouse generates. */
@@ -45,7 +45,7 @@ class CriticalRequestChains extends Audit {
 
   /**
    * @param {LH.Audit.SimpleCriticalRequestNode} tree
-   * @param {function(CrcNodeInfo)} cb
+   * @param {function(CrcNodeInfo): void} cb
    */
   static _traverse(tree, cb) {
     /**
@@ -201,7 +201,7 @@ class CriticalRequestChains extends Audit {
       const longestChain = CriticalRequestChains._getLongestChain(flattenedChains);
 
       return {
-        rawValue: chainCount === 0,
+        score: Number(chainCount === 0),
         notApplicable: chainCount === 0,
         displayValue: chainCount ? str_(UIStrings.displayValue, {itemCount: chainCount}) : '',
         extendedInfo: {
@@ -211,7 +211,7 @@ class CriticalRequestChains extends Audit {
           },
         },
         details: {
-          type: 'criticalrequestchain',
+          type: /** @type {'criticalrequestchain'} */('criticalrequestchain'),
           chains: flattenedChains,
           longestChain,
         },

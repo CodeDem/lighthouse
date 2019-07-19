@@ -11,13 +11,11 @@ const assert = require('assert');
 const fs = require('fs');
 const jsdom = require('jsdom');
 const Util = require('../../../../report/html/renderer/util.js');
-const URL = require('../../../../lib/url-shim');
+const URL = require('../../../../lib/url-shim.js');
 const DOM = require('../../../../report/html/renderer/dom.js');
 const DetailsRenderer = require('../../../../report/html/renderer/details-renderer.js');
 const ReportUIFeatures = require('../../../../report/html/renderer/report-ui-features.js');
 const CategoryRenderer = require('../../../../report/html/renderer/category-renderer.js');
-// lazy loaded because it depends on CategoryRenderer to be available globally
-let PerformanceCategoryRenderer = null;
 const CriticalRequestChainRenderer = require(
     '../../../../report/html/renderer/crc-details-renderer.js');
 const ReportRenderer = require('../../../../report/html/renderer/report-renderer.js');
@@ -38,11 +36,12 @@ describe('ReportRenderer', () => {
     global.CriticalRequestChainRenderer = CriticalRequestChainRenderer;
     global.DetailsRenderer = DetailsRenderer;
     global.CategoryRenderer = CategoryRenderer;
-    if (!PerformanceCategoryRenderer) {
-      PerformanceCategoryRenderer =
+
+    // lazy loaded because they depend on CategoryRenderer to be available globally
+    global.PerformanceCategoryRenderer =
         require('../../../../report/html/renderer/performance-category-renderer.js');
-    }
-    global.PerformanceCategoryRenderer = PerformanceCategoryRenderer;
+    global.PwaCategoryRenderer =
+        require('../../../../report/html/renderer/pwa-category-renderer.js');
 
     // Stub out matchMedia for Node.
     global.matchMedia = function() {
@@ -51,10 +50,10 @@ describe('ReportRenderer', () => {
       };
     };
 
-    const document = jsdom.jsdom(TEMPLATE_FILE);
-    global.self = document.defaultView;
+    const {window} = new jsdom.JSDOM(TEMPLATE_FILE);
+    global.self = window;
 
-    const dom = new DOM(document);
+    const dom = new DOM(window.document);
     const detailsRenderer = new DetailsRenderer(dom);
     const categoryRenderer = new CategoryRenderer(dom, detailsRenderer);
     renderer = new ReportRenderer(dom, categoryRenderer);
@@ -71,16 +70,18 @@ describe('ReportRenderer', () => {
     global.DetailsRenderer = undefined;
     global.CategoryRenderer = undefined;
     global.PerformanceCategoryRenderer = undefined;
+    global.PwaCategoryRenderer = undefined;
   });
 
   describe('renderReport', () => {
     it('should render a report', () => {
       const container = renderer._dom._document.body;
       const output = renderer.renderReport(sampleResults, container);
-      assert.ok(output.querySelector('.lh-header-sticky'), 'has a header');
+      assert.ok(output.querySelector('.lh-header-container'), 'has a header');
       assert.ok(output.querySelector('.lh-report'), 'has report body');
-      assert.equal(output.querySelectorAll('.lh-gauge').length,
-          sampleResults.reportCategories.length * 2, 'renders category gauges');
+      // 3 sets of gauges - one in sticky header, one in scores header, and one in each section.
+      assert.equal(output.querySelectorAll('.lh-gauge__wrapper, .lh-gauge--pwa__wrapper').length,
+          Object.keys(sampleResults.categories).length * 3, 'renders category gauges');
     });
 
     it('renders additional reports by replacing the existing one', () => {
@@ -92,16 +93,72 @@ describe('ReportRenderer', () => {
         'new report appended to container');
     });
 
-    it('renders a header', () => {
-      const header = renderer._renderReportHeader(sampleResults);
-      assert.ok(header.querySelector('.lh-export'), 'contains export button');
+    it('renders a topbar', () => {
+      const topbar = renderer._renderReportTopbar(sampleResults);
+      assert.equal(topbar.querySelector('.lh-topbar__url').textContent, sampleResults.finalUrl);
+    });
 
-      assert.ok(header.querySelector('.lh-config__timestamp').textContent.match(TIMESTAMP_REGEX),
-          'formats the generated datetime');
-      assert.equal(header.querySelector('.lh-metadata__url').textContent, sampleResults.finalUrl);
-      const url = header.querySelector('.lh-metadata__url');
-      assert.equal(url.textContent, sampleResults.finalUrl);
-      assert.equal(url.href, sampleResults.finalUrl);
+    it('renders a header', () => {
+      const header = renderer._renderReportHeader();
+      assert.ok(header.querySelector('.lh-scores-container'), 'contains score container');
+    });
+
+    it('renders score gauges in this order: default, pwa, plugins', () => {
+      const sampleResultsCopy = JSON.parse(JSON.stringify(sampleResults));
+      sampleResultsCopy.categories['lighthouse-plugin-someplugin'] = {
+        id: 'lighthouse-plugin-someplugin',
+        title: 'Some Plugin',
+        auditRefs: [],
+      };
+
+      const container = renderer._dom._document.body;
+      const output = renderer.renderReport(sampleResultsCopy, container);
+
+      const indexOfPwaGauge = Array.from(output
+        .querySelectorAll('.lh-scores-header > a[class*="lh-gauge"]')).findIndex(el => {
+        return el.matches('.lh-gauge--pwa__wrapper');
+      });
+
+      const indexOfPluginGauge = Array.from(output
+        .querySelectorAll('.lh-scores-header > a[class*="lh-gauge"]')).findIndex(el => {
+        return el.matches('.lh-gauge__wrapper--plugin');
+      });
+
+      const scoresHeaderElem = output.querySelector('.lh-scores-header');
+      assert.equal(scoresHeaderElem.children.length - 2, indexOfPwaGauge);
+      assert.equal(scoresHeaderElem.children.length - 1, indexOfPluginGauge);
+      assert(indexOfPluginGauge > indexOfPwaGauge);
+
+      for (let i = 0; i < scoresHeaderElem.children.length; i++) {
+        const gauge = scoresHeaderElem.children[i];
+
+        assert.ok(gauge.classList.contains('lh-gauge__wrapper'));
+        if (i >= indexOfPluginGauge) {
+          assert.ok(gauge.classList.contains('lh-gauge__wrapper--plugin'));
+        } else if (i >= indexOfPwaGauge) {
+          assert.ok(gauge.classList.contains('lh-gauge--pwa__wrapper'));
+        }
+      }
+    });
+
+    it('renders plugin score gauge', () => {
+      const sampleResultsCopy = JSON.parse(JSON.stringify(sampleResults));
+      sampleResultsCopy.categories['lighthouse-plugin-someplugin'] = {
+        id: 'lighthouse-plugin-someplugin',
+        title: 'Some Plugin',
+        auditRefs: [],
+      };
+      const container = renderer._dom._document.body;
+      const output = renderer.renderReport(sampleResultsCopy, container);
+      const scoresHeaderElem = output.querySelector('.lh-scores-header');
+
+      const gaugeCount = scoresHeaderElem.querySelectorAll('.lh-gauge').length;
+      const pluginGaugeCount =
+        scoresHeaderElem.querySelectorAll('.lh-gauge__wrapper--plugin').length;
+
+      // 5 core categories + the 1 plugin.
+      assert.equal(6, gaugeCount);
+      assert.equal(1, pluginGaugeCount);
     });
 
     it('should not mutate a report object', () => {
@@ -149,8 +206,49 @@ describe('ReportRenderer', () => {
   it('can set a custom templateContext', () => {
     assert.equal(renderer._templateContext, renderer._dom.document());
 
-    const otherDocument = jsdom.jsdom(TEMPLATE_FILE);
+    const {window} = new jsdom.JSDOM(TEMPLATE_FILE);
+    const otherDocument = window.document;
     renderer.setTemplateContext(otherDocument);
     assert.equal(renderer._templateContext, otherDocument);
+  });
+
+  it('should add LHR channel to doc link parameters', () => {
+    const lhrChannel = sampleResults.configSettings.channel;
+    // Make sure we have a channel in the LHR.
+    assert.ok(lhrChannel.length > 2);
+
+    const container = renderer._dom._document.body;
+    const output = renderer.renderReport(sampleResults, container);
+
+    const utmChannels = [...output.querySelectorAll('a[href*="utm_source=lighthouse"')]
+      .map(a => new URL(a.href))
+      .filter(url => url.origin === 'https://developers.google.com')
+      .map(url => url.searchParams.get('utm_medium'));
+
+    assert.ok(utmChannels.length > 20);
+    utmChannels.forEach(anchorChannel => {
+      assert.strictEqual(anchorChannel, lhrChannel);
+    });
+  });
+
+  it('renders `not_applicable` audits as `notApplicable`', () => {
+    const clonedSampleResult = JSON.parse(JSON.stringify(sampleResultsOrig));
+
+    let notApplicableCount = 0;
+    Object.values(clonedSampleResult.audits).forEach(audit => {
+      // The performance-budget audit is omitted from the DOM when it is not applicable
+      if (audit.scoreDisplayMode === 'notApplicable' && audit.id !== 'performance-budget') {
+        notApplicableCount++;
+        audit.scoreDisplayMode = 'not_applicable';
+      }
+    });
+
+    assert.ok(notApplicableCount > 20); // Make sure something's being tested.
+
+    const container = renderer._dom._document.body;
+    const reportElement = renderer.renderReport(sampleResults, container);
+    const notApplicableElementCount = reportElement
+      .querySelectorAll('.lh-audit--notapplicable').length;
+    assert.strictEqual(notApplicableCount, notApplicableElementCount);
   });
 });

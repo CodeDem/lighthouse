@@ -15,6 +15,10 @@ describe('Default Config', () => {
   it('only has opportunity audits that return opportunities details', async () => {
     const flags = {
       auditMode: __dirname + '/../results/artifacts/',
+
+      // sample_v2 was run with these settings, so need to match them.
+      throttlingMethod: 'devtools',
+      channel: 'cli',
     };
     const {lhr} = await lighthouse('', flags);
 
@@ -30,7 +34,7 @@ describe('Default Config', () => {
 
     // And that they have the correct shape.
     opportunityResults.forEach(auditResult => {
-      assert.strictEqual(auditResult.details.type, 'opportunity');
+      expect(auditResult).toMatchObject({details: {type: 'opportunity'}});
       assert.ok(!auditResult.errorMessage, `${auditResult.id}: ${auditResult.errorMessage}`);
       assert.ok(auditResult.details.overallSavingsMs !== undefined,
           `${auditResult.id} has an undefined overallSavingsMs`);

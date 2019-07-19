@@ -9,16 +9,18 @@
 
 const path = require('path');
 
-const Printer = require('./printer');
+const Printer = require('./printer.js');
 const ChromeLauncher = require('chrome-launcher');
 
 const yargsParser = require('yargs-parser');
-const lighthouse = require('../lighthouse-core');
+const lighthouse = require('../lighthouse-core/index.js');
 const log = require('lighthouse-logger');
-const getFilenamePrefix = require('../lighthouse-core/lib/file-namer').getFilenamePrefix;
-const assetSaver = require('../lighthouse-core/lib/asset-saver');
+const getFilenamePrefix = require('../lighthouse-core/lib/file-namer.js').getFilenamePrefix;
+const assetSaver = require('../lighthouse-core/lib/asset-saver.js');
 
-const opn = require('opn');
+const open = require('open');
+
+/** @typedef {import('../lighthouse-core/lib/lh-error.js')} LighthouseError */
 
 const _RUNTIME_ERROR_CODE = 1;
 const _PROTOCOL_TIMEOUT_EXIT_CODE = 67;
@@ -60,37 +62,41 @@ function getDebuggableChrome(flags) {
   });
 }
 
-function showConnectionError() {
+/** @return {never} */
+function printConnectionErrorAndExit() {
   console.error('Unable to connect to Chrome');
-  process.exit(_RUNTIME_ERROR_CODE);
+  return process.exit(_RUNTIME_ERROR_CODE);
 }
 
-function showProtocolTimeoutError() {
+/** @return {never} */
+function printProtocolTimeoutErrorAndExit() {
   console.error('Debugger protocol timed out while connecting to Chrome.');
-  process.exit(_PROTOCOL_TIMEOUT_EXIT_CODE);
+  return process.exit(_PROTOCOL_TIMEOUT_EXIT_CODE);
 }
 
 /**
- * @param {LH.LighthouseError} err
+ * @param {LighthouseError} err
+ * @return {never}
  */
-function showRuntimeError(err) {
+function printRuntimeErrorAndExit(err) {
   console.error('Runtime error encountered:', err.friendlyMessage || err.message);
   if (err.stack) {
     console.error(err.stack);
   }
-  process.exit(_RUNTIME_ERROR_CODE);
+  return process.exit(_RUNTIME_ERROR_CODE);
 }
 
 /**
- * @param {LH.LighthouseError} err
+ * @param {LighthouseError} err
+ * @return {never}
  */
-function handleError(err) {
+function printErrorAndExit(err) {
   if (err.code === 'ECONNREFUSED') {
-    showConnectionError();
+    return printConnectionErrorAndExit();
   } else if (err.code === 'CRI_TIMEOUT') {
-    showProtocolTimeoutError();
+    return printProtocolTimeoutErrorAndExit();
   } else {
-    showRuntimeError(err);
+    return printRuntimeErrorAndExit(err);
   }
 }
 
@@ -101,6 +107,11 @@ function handleError(err) {
  */
 async function saveResults(runnerResult, flags) {
   const cwd = process.cwd();
+
+  if (flags.lanternDataOutputPath) {
+    const devtoolsLog = runnerResult.artifacts.devtoolsLogs.defaultPass;
+    await assetSaver.saveLanternNetworkData(devtoolsLog, flags.lanternDataOutputPath);
+  }
 
   const shouldSaveResults = flags.auditMode || (flags.gatherMode === flags.auditMode);
   if (!shouldSaveResults) return;
@@ -127,7 +138,7 @@ async function saveResults(runnerResult, flags) {
 
     if (outputType === Printer.OutputMode[Printer.OutputMode.html]) {
       if (flags.view) {
-        opn(outputPath, {wait: false});
+        open(outputPath, {wait: false});
       } else {
         // eslint-disable-next-line max-len
         log.log('CLI', 'Protip: Run lighthouse with `--view` to immediately open the HTML report in your browser');
@@ -137,53 +148,76 @@ async function saveResults(runnerResult, flags) {
 }
 
 /**
+ * Attempt to kill the launched Chrome, if defined.
+ * @param {ChromeLauncher.LaunchedChrome=} launchedChrome
+ * @return {Promise<void>}
+ */
+async function potentiallyKillChrome(launchedChrome) {
+  if (!launchedChrome) return;
+
+  return Promise.race([
+    launchedChrome.kill(),
+    new Promise((_, reject) => setTimeout(reject, 5000, 'Timed out.')),
+  ]).catch(err => {
+    throw new Error(`Couldn't quit Chrome process. ${err}`);
+  });
+}
+
+/**
  * @param {string} url
  * @param {LH.CliFlags} flags
  * @param {LH.Config.Json|undefined} config
- * @return {Promise<LH.RunnerResult|void>}
+ * @return {Promise<LH.RunnerResult|undefined>}
  */
-function runLighthouse(url, flags, config) {
+async function runLighthouse(url, flags, config) {
+  /** @param {any} reason */
+  async function handleTheUnhandled(reason) {
+    process.stderr.write(`Unhandled Rejection. Reason: ${reason}\n`);
+    await potentiallyKillChrome(launchedChrome).catch(() => {});
+    setTimeout(_ => {
+      process.exit(1);
+    }, 100);
+  }
+  process.on('unhandledRejection', handleTheUnhandled);
+
   /** @type {ChromeLauncher.LaunchedChrome|undefined} */
   let launchedChrome;
-  const shouldGather = flags.gatherMode || flags.gatherMode === flags.auditMode;
-  let chromeP = Promise.resolve();
 
-  if (shouldGather) {
-    chromeP = chromeP.then(_ =>
-      getDebuggableChrome(flags).then(launchedChromeInstance => {
-        launchedChrome = launchedChromeInstance;
-        flags.port = launchedChrome.port;
-      })
-    );
-  }
-
-  const resultsP = chromeP.then(_ => {
-    return lighthouse(url, flags, config).then(runnerResult => {
-      return potentiallyKillChrome().then(_ => runnerResult);
-    }).then(async runnerResult => {
-      // If in gatherMode only, there will be no runnerResult.
-      if (runnerResult) {
-        await saveResults(runnerResult, flags);
-      }
-
-      return runnerResult;
-    });
-  });
-
-  return resultsP.catch(err => {
-    return Promise.resolve()
-      .then(_ => potentiallyKillChrome())
-      .then(_ => handleError(err));
-  });
-
-  /**
-   * @return {Promise<{}>}
-   */
-  function potentiallyKillChrome() {
-    if (launchedChrome !== undefined) {
-      return launchedChrome.kill();
+  try {
+    const shouldGather = flags.gatherMode || flags.gatherMode === flags.auditMode;
+    if (shouldGather) {
+      launchedChrome = await getDebuggableChrome(flags);
+      flags.port = launchedChrome.port;
     }
-    return Promise.resolve({});
+
+    const runnerResult = await lighthouse(url, flags, config);
+
+    // If in gatherMode only, there will be no runnerResult.
+    if (runnerResult) {
+      await saveResults(runnerResult, flags);
+    }
+
+    await potentiallyKillChrome(launchedChrome);
+    process.removeListener('unhandledRejection', handleTheUnhandled);
+
+    // Runtime errors indicate something was *very* wrong with the page result.
+    // We don't want the user to have to parse the report to figure it out, so we'll still exit
+    // with an error code after we saved the results.
+    if (runnerResult && runnerResult.lhr.runtimeError) {
+      const {runtimeError} = runnerResult.lhr;
+      return printErrorAndExit({
+        name: 'LHError',
+        friendlyMessage: runtimeError.message,
+        lhrRuntimeError: true,
+        code: runtimeError.code,
+        message: runtimeError.message,
+      });
+    }
+
+    return runnerResult;
+  } catch (err) {
+    await potentiallyKillChrome(launchedChrome).catch(() => {});
+    return printErrorAndExit(err);
   }
 }
 

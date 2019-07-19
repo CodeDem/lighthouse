@@ -39,7 +39,7 @@ driver.sendCommand('Security.enable');
 
 ## Understanding a Trace
 
-`lighthouse-core/gather/computed/trace-of-tab.js` and `lighthouse-core/lib/traces/tracing-processor.js` provide the core transformation of a trace into more meaningful objects. Each raw trace event has a monotonically increasing timestamp in microseconds, a thread ID, a process ID, a duration in microseconds (potentially), and other applicable metadata properties such as the event type, the task name, the frame, etc. [Learn more about trace events](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview).
+`lighthouse-core/lib/tracehouse/trace-processor.js` provides the core transformation of a trace into more meaningful objects. Each raw trace event has a monotonically increasing timestamp in microseconds, a thread ID, a process ID, a duration in microseconds (potentially), and other applicable metadata properties such as the event type, the task name, the frame, etc. [Learn more about trace events](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview).
 
 ### Example Trace Event
 ```js
@@ -84,7 +84,7 @@ Tracing processor takes the output of trace of tab and identifies the top-level 
 
 ## Audits
 
-The return value of each audit [takes this shape](https://github.com/GoogleChrome/lighthouse/blob/8f500e00243e07ef0a80b39334bedcc8ddc8d3d0/typings/audit.d.ts#L117-L130).
+The return value of each audit [takes this shape](https://github.com/GoogleChrome/lighthouse/blob/623b789497f6c87f85d366b4038deae5dc701c90/types/audit.d.ts#L69-L87).
 
 The `details` object is parsed in report-renderer.js. View other audits for guidance on how to structure `details`.
 
